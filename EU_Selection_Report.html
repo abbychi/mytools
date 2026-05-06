@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EU 选品报告 - 多站点分析</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+<style>
+:root{--amazon-dark:#131921;--amazon-orange:#FF9900;--amazon-blue:#232F3E;--amazon-light:#F3F3F3;--border-gray:#BFBFBF;--success:#067D62;--danger:#D13212}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',Calibri,Arial,sans-serif;background:#F5F6FA;color:#1A1A2E;font-size:13px;line-height:1.5}
+.header{background:var(--amazon-dark);color:#fff;padding:16px 32px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+.header h1{font-size:18px;font-weight:600}.header h1 span{color:var(--amazon-orange)}
+.container{max-width:1440px;margin:0 auto;padding:16px 24px}
+.upload-hub{background:#fff;border-radius:8px;padding:14px 20px;margin-bottom:14px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.upload-hub h2{font-size:13px;font-weight:700;margin-bottom:8px;color:var(--amazon-blue)}
+.upload-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.upload-card{border:1.5px solid #E0E0E0;border-radius:6px;padding:8px;text-align:center}
+.upload-card:hover{border-color:var(--amazon-orange)}
+.mp-label{font-weight:700;font-size:11px;margin-bottom:4px}
+.upload-slot{margin:3px 0}
+.upload-slot label{display:block;font-size:9px;color:#666;margin-bottom:2px;font-weight:600}
+.upload-btn{display:block;padding:3px 8px;font-size:10px;border:1px dashed var(--border-gray);border-radius:4px;cursor:pointer;background:var(--amazon-light);width:100%;text-align:center}
+.upload-btn.loaded{background:#E6F4EA;border-color:var(--success);border-style:solid;color:var(--success);font-weight:600}
+.upload-btn input[type=file]{display:none}
+.exec-dashboard{background:#fff;border-radius:8px;padding:20px;margin-bottom:14px;box-shadow:0 1px 4px rgba(0,0,0,.1);border-top:3px solid var(--amazon-orange);display:none}
+.exec-dashboard.visible{display:block}
+.exec-dashboard h2{font-size:15px;font-weight:700;color:var(--amazon-dark);margin-bottom:14px}
+.exec-kpi-row{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:16px}
+.exec-kpi{border-radius:8px;padding:12px;text-align:center;color:#fff}
+.exec-kpi .kpi-flag{font-size:20px}
+.exec-kpi .kpi-mp{font-size:9px;font-weight:700;text-transform:uppercase}
+.exec-kpi .kpi-val{font-size:16px;font-weight:800;margin:3px 0}
+.exec-kpi .kpi-yoy{font-size:11px;font-weight:700;padding:2px 6px;border-radius:10px;display:inline-block;background:rgba(255,255,255,.2)}
+.exec-kpi .kpi-share{font-size:9px;color:rgba(255,255,255,.7);margin-top:3px}
+.heatmap-wrap{margin-bottom:16px}
+.heatmap-wrap h3{font-size:12px;font-weight:700;color:#333;margin-bottom:6px}
+.heatmap{width:100%;border-collapse:collapse;font-size:10px}
+.heatmap th{background:var(--amazon-dark);color:#fff;padding:5px 6px;font-size:9px;font-weight:600;text-align:center}
+.heatmap td{padding:4px 3px;text-align:center;font-weight:600;font-size:9px;border:1px solid #E8E8E8;line-height:1.2;vertical-align:middle}
+.heatmap .mp-col{text-align:left;font-weight:700;padding-left:8px;background:#FAFAFA;white-space:nowrap}
+.scorecard-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:16px}
+.scorecard{border:1px solid #E0E0E0;border-radius:8px;padding:12px}
+.scorecard .sc-header{font-weight:700;font-size:11px;margin-bottom:8px}
+.scorecard .sc-row{display:flex;justify-content:space-between;align-items:center;padding:2px 0;font-size:10px;border-bottom:1px solid #F0F0F0}
+.scorecard .sc-row:last-child{border-bottom:none}
+.scorecard .sc-label{color:#666}
+.scorecard .sc-val{font-weight:700}
+.potential-tag{display:inline-block;padding:2px 6px;border-radius:10px;font-size:9px;font-weight:700}
+.potential-high{background:#E6F4EA;color:var(--success)}
+.potential-mid{background:#FFF3E0;color:#E65100}
+.potential-low{background:#FCE8E6;color:var(--danger)}
+.potential-stable{background:#E8EAF6;color:#3F51B5}
+.exec-charts-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
+.exec-chart-box{border:1px solid #E8E8E8;border-radius:6px;padding:12px}
+.exec-chart-box h3{font-size:11px;font-weight:600;color:#555;margin-bottom:6px}
+.exec-canvas-wrap{position:relative;height:220px}
+.exec-insight{background:linear-gradient(135deg,#232F3E 0%,#37475A 100%);border-radius:8px;padding:18px 22px;color:#fff;font-size:12px;line-height:1.8}
+.exec-insight strong{color:var(--amazon-orange)}
+.insight-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:14px}
+.insight-card{background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.06);border:1px solid #E8E8E8}
+.insight-card .card-header{padding:10px 14px;color:#fff;display:flex;align-items:center;gap:8px}
+.insight-card .card-header .card-icon{font-size:18px}
+.insight-card .card-header .card-titles{flex:1}
+.insight-card .card-header h4{font-size:12px;font-weight:700;margin:0;color:#fff}
+.insight-card .card-header .card-sub{font-size:9px;opacity:.8;margin-top:1px}
+.insight-card .card-body{padding:12px 14px}
+.insight-card ul{list-style:none;padding:0;margin:0}
+.insight-card li{font-size:11px;line-height:1.6;padding:4px 0;border-bottom:1px solid #F0F0F0;color:#333}
+.insight-card li:last-child{border-bottom:none}
+.insight-card .highlight{color:var(--amazon-orange);font-weight:700}
+.insight-card .tag-green{background:#E6F4EA;color:var(--success);padding:1px 6px;border-radius:8px;font-size:9px;font-weight:700}
+.insight-card .tag-red{background:#FCE8E6;color:var(--danger);padding:1px 6px;border-radius:8px;font-size:9px;font-weight:700}
+.insight-card .tag-blue{background:#E8EAF6;color:#3F51B5;padding:1px 6px;border-radius:8px;font-size:9px;font-weight:700}
+.insight-card .tag-yellow{background:#FFF8E1;color:#F57F17;padding:1px 6px;border-radius:8px;font-size:9px;font-weight:700}
+.insight-summary{background:var(--amazon-dark);border-radius:8px;padding:14px 18px;color:var(--amazon-orange);font-size:12px;font-weight:700;text-align:center;line-height:1.6}
+.positive{color:var(--success)}.negative{color:var(--danger)}
+.mp-section{background:#fff;border-radius:8px;padding:18px 20px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.08);display:none}
+.mp-section.visible{display:block}
+.mp-section-header{display:flex;align-items:center;gap:8px;margin-bottom:12px;padding-bottom:6px;border-bottom:2px solid var(--amazon-light)}
+.mp-section-header h2{font-size:14px;font-weight:700}
+.charts-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+.chart-box{border:1px solid #E8E8E8;border-radius:6px;padding:10px}
+.chart-box h3{font-size:10px;font-weight:600;color:#555;margin-bottom:4px}
+.chart-canvas-wrap{position:relative;height:220px}
+.kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px}
+.kpi-card{background:var(--amazon-light);border-radius:6px;padding:8px 10px;text-align:center}
+.kpi-label{font-size:9px;color:#777;font-weight:600}
+.kpi-value{font-size:16px;font-weight:700;margin:2px 0}
+.kpi-change{font-size:10px;font-weight:600}
+.brand-table-wrap{margin-top:8px;overflow-x:auto}
+.brand-table{width:100%;border-collapse:collapse;font-size:10px}
+.brand-table thead th{background:var(--amazon-dark);color:#fff;padding:5px 8px;text-align:left;font-weight:600;font-size:9px}
+.brand-table tbody td{padding:4px 8px;border-bottom:1px solid #ECECEC}
+.num{text-align:right;font-variant-numeric:tabular-nums}
+.share-bar{display:inline-block;height:5px;border-radius:3px;background:var(--amazon-orange);vertical-align:middle;margin-right:4px}
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>EU 选品报告 <span>| 多站点分析（销售额角度）</span></h1>
+</div>
+<div class="container">
+  <div class="upload-hub">
+    <h2>数据上传</h2>
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
+      <button id="btnAutoImport" onclick="autoImport()" style="background:var(--amazon-orange);color:#fff;border:none;padding:7px 18px;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer">一键导入</button>
+      <span id="importStatus" style="font-size:11px;color:#999"></span>
+    </div>
+    <div class="upload-grid" id="uploadGrid"></div>
+  </div>
+  <div class="exec-dashboard" id="execDashboard">
+    <h2>EU5 品类速览</h2>
+    <div class="exec-kpi-row" id="execKpiRow"></div>
+    <div class="heatmap-wrap"><h3>月度 GMS + 同比热力图</h3><div id="heatmapContainer" style="display:flex;gap:14px;overflow-x:auto"></div></div>
+    <div class="scorecard-grid" id="scorecardGrid"></div>
+    <div class="exec-charts-row">
+      <div class="exec-chart-box"><h3>各站点 GMS 年度对比</h3><div class="exec-canvas-wrap"><canvas id="execStackedChart"></canvas></div></div>
+      <div class="exec-chart-box"><h3>品牌 Top10 集中度</h3><div class="exec-canvas-wrap"><canvas id="execBrandChart"></canvas></div></div>
+    </div>
+    <div id="execInsight"></div>
+  </div>
+  <div id="marketplaceSections"></div>
+</div>
+<script>
+const MPS=[
+  {id:'uk',name:'英国',flag:'🇬🇧',color:'#1A73E8'},
+  {id:'de',name:'德国',flag:'🇩🇪',color:'#E8710A'},
+  {id:'fr',name:'法国',flag:'🇫🇷',color:'#9334E6'},
+  {id:'it',name:'意大利',flag:'🇮🇹',color:'#34A853'},
+  {id:'es',name:'西班牙',flag:'🇪🇸',color:'#D93025'}
+];
+const store={},charts={};
+MPS.forEach(mp=>{store[mp.id]={gms:null,brand:null};});
+const MN=['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function fmt(n){if(n==null||isNaN(n))return'-';if(Math.abs(n)>=1e6)return'$'+(n/1e6).toFixed(2)+'MM';if(Math.abs(n)>=1e3)return'$'+(n/1e3).toFixed(1)+'K';return'$'+n.toFixed(0);}
+function fmtShort(n){if(n==null||isNaN(n)||n===0)return'-';if(Math.abs(n)>=1e6)return'$'+(n/1e6).toFixed(1)+'M';if(Math.abs(n)>=1e3)return'$'+(n/1e3).toFixed(0)+'K';return'$'+n.toFixed(0);}
+function fmtPct(n){return n==null?'-':(n>=0?'+':'')+n.toFixed(1)+'%';}
+function heatColor(v){if(v==null)return{bg:'#F5F5F5',color:'#999'};if(v>=20)return{bg:'#1B5E20',color:'#fff'};if(v>=10)return{bg:'#388E3C',color:'#fff'};if(v>=5)return{bg:'#66BB6A',color:'#fff'};if(v>=0)return{bg:'#C8E6C9',color:'#1B5E20'};if(v>=-5)return{bg:'#FFCDD2',color:'#B71C1C'};if(v>=-10)return{bg:'#EF5350',color:'#fff'};return{bg:'#B71C1C',color:'#fff'};}
+function getColMap(d){const m={};Object.keys(d[0]).forEach(k=>{const l=k.trim().toLowerCase().replace(/\s+/g,'_');if(l.includes('month'))m.month=k;else if(l.includes('year'))m.year=k;else if(l.includes('gms')||l.includes('net_order')||l.includes('net order'))m.gms=k;});return m;}
+function getBrandColMap(d){const m={};Object.keys(d[0]).forEach(k=>{const l=k.trim().toLowerCase().replace(/\s+/g,'_');if(l.includes('brand'))m.brand=k;else if(l.includes('gms')||l.includes('net_order')||l.includes('net order'))m.gms=k;});return m;}
+function buildMonthly(d){const c=getColMap(d),m={};d.forEach(r=>{const mo=parseInt(r[c.month]),y=parseInt(r[c.year]);let g=parseFloat(String(r[c.gms]).replace(/[,$]/g,''));if(isNaN(mo)||isNaN(y)||isNaN(g))return;const k=y+'-'+String(mo).padStart(2,'0');m[k]=(m[k]||0)+g;});return m;}
+function destroyChart(id){if(charts[id]){charts[id].destroy();delete charts[id];}}
+
+// Build UI
+(function(){
+  const grid=document.getElementById('uploadGrid');
+  MPS.forEach(mp=>{const c=document.createElement('div');c.className='upload-card';c.innerHTML=`<div class="mp-label">${mp.flag} ${mp.id.toUpperCase()}</div><div class="upload-slot"><label>GMS</label><label class="upload-btn" id="btn-gms-${mp.id}">上传 CSV<input type="file" accept=".csv" onchange="handleUpload('${mp.id}','gms',this)"></label></div><div class="upload-slot"><label>品牌</label><label class="upload-btn" id="btn-brand-${mp.id}">上传 CSV<input type="file" accept=".csv" onchange="handleUpload('${mp.id}','brand',this)"></label></div>`;grid.appendChild(c);});
+  const wrap=document.getElementById('marketplaceSections');
+  MPS.forEach(mp=>{const s=document.createElement('div');s.className='mp-section';s.id='section-'+mp.id;s.innerHTML=`<div class="mp-section-header"><span style="font-size:18px">${mp.flag}</span><h2 style="color:${mp.color}">${mp.name} (${mp.id.toUpperCase()})</h2></div><div class="kpi-row" id="kpis-${mp.id}"></div><div class="charts-row"><div class="chart-box"><h3>月度 GMS</h3><div class="chart-canvas-wrap"><canvas id="chart-gms-${mp.id}"></canvas></div></div><div class="chart-box"><h3>GMS 同比变化</h3><div class="chart-canvas-wrap"><canvas id="chart-yoy-${mp.id}"></canvas></div></div></div><div class="charts-row"><div class="chart-box"><h3>年度对比</h3><div class="chart-canvas-wrap"><canvas id="chart-overlay-${mp.id}"></canvas></div></div><div class="chart-box"><h3>品牌 Top 15</h3><div class="chart-canvas-wrap"><canvas id="chart-brand-${mp.id}"></canvas></div></div></div><div class="brand-table-wrap" id="brandtable-${mp.id}"></div>`;wrap.appendChild(s);});
+})();
+
+function handleUpload(mpId,type,input){const file=input.files[0];if(!file)return;const btn=document.getElementById('btn-'+type+'-'+mpId);Papa.parse(file,{header:true,skipEmptyLines:true,dynamicTyping:true,complete:function(r){store[mpId][type]=r.data;btn.classList.add('loaded');btn.childNodes[0].textContent='✓ '+file.name;try{localStorage.setItem('eu_report_'+mpId+'_'+type,JSON.stringify({fileName:file.name,data:r.data}));}catch(e){}renderMP(mpId);renderExecDashboard();}});}
+async function autoImport(){const btn=document.getElementById('btnAutoImport'),st=document.getElementById('importStatus');btn.disabled=true;btn.textContent='导入中...';st.textContent='';try{const r=await fetch('http://localhost:8899/api/refresh');const j=await r.json();const data=j.data||j;let cnt=0;MPS.forEach(mp=>{['gms','brand'].forEach(type=>{if(data[mp.id]&&data[mp.id][type]&&data[mp.id][type].length){store[mp.id][type]=data[mp.id][type];cnt++;const fn=data[mp.id][type+'_file']||'auto';const b=document.getElementById('btn-'+type+'-'+mp.id);if(b){b.classList.add('loaded');b.childNodes[0].textContent='✓ '+fn;}try{localStorage.setItem('eu_report_'+mp.id+'_'+type,JSON.stringify({fileName:fn,data:data[mp.id][type]}));}catch(e){}}});renderMP(mp.id);});renderExecDashboard();st.textContent='成功导入 '+cnt+' 个数据集';st.style.color='var(--success)';}catch(e){st.textContent='导入失败，请确认已运行 python eu_data_server.py';st.style.color='var(--danger)';}finally{btn.disabled=false;btn.textContent='一键导入';}}
+(function(){MPS.forEach(mp=>{['gms','brand'].forEach(type=>{try{const raw=localStorage.getItem('eu_report_'+mp.id+'_'+type);if(!raw)return;const{fileName,data}=JSON.parse(raw);if(!data||!data.length)return;store[mp.id][type]=data;const btn=document.getElementById('btn-'+type+'-'+mp.id);if(btn){btn.classList.add('loaded');btn.childNodes[0].textContent='✓ '+fileName;}}catch(e){}});renderMP(mp.id);});renderExecDashboard();})();
+
+function renderMP(mpId){
+  const gmsData=store[mpId].gms,brandData=store[mpId].brand,sec=document.getElementById('section-'+mpId),mpCfg=MPS.find(m=>m.id===mpId);
+  if(!gmsData&&!brandData){sec.classList.remove('visible');return;}
+  sec.classList.add('visible');
+  if(gmsData&&gmsData.length){
+    const monthly=buildMonthly(gmsData),sortedKeys=Object.keys(monthly).sort();
+    const years=[...new Set(sortedKeys.map(k=>parseInt(k.split('-')[0])))].sort();
+    const months=[...new Set(sortedKeys.map(k=>parseInt(k.split('-')[1])))].sort((a,b)=>a-b);
+    const latestYear=years[years.length-1],prevYear=years.length>1?years[years.length-2]:null;
+    let totalLatest=0,totalPrev=0,latestMonthVal=0,prevMonthVal=0,latestMonthLabel='';
+    const latestYearKeys=sortedKeys.filter(k=>parseInt(k.split('-')[0])===latestYear);
+    const lmSet=new Set(latestYearKeys.map(k=>k.split('-')[1]));
+    if(latestYearKeys.length){const lk=latestYearKeys[latestYearKeys.length-1];const lm=parseInt(lk.split('-')[1]);latestMonthLabel=MN[lm];latestMonthVal=monthly[lk];const pk=prevYear+'-'+String(lm).padStart(2,'0');prevMonthVal=monthly[pk]||0;}
+    sortedKeys.forEach(k=>{const[y,m]=k.split('-');if(y==latestYear)totalLatest+=monthly[k];if(y==prevYear&&lmSet.has(m))totalPrev+=monthly[k];});
+    const ytdYoy=prevYear&&totalPrev?((totalLatest/totalPrev-1)*100):null;
+    const momKeys=latestYearKeys.length>=2?latestYearKeys.slice(-2):[];
+    const momChange=momKeys.length===2&&monthly[momKeys[0]]?((monthly[momKeys[1]]/monthly[momKeys[0]]-1)*100):null;
+    const latestMoYoy=prevMonthVal?((latestMonthVal/prevMonthVal-1)*100):null;
+    document.getElementById('kpis-'+mpId).innerHTML=`<div class="kpi-card"><div class="kpi-label">YTD ${latestYear}</div><div class="kpi-value">${fmt(totalLatest)}</div><div class="kpi-change ${ytdYoy>=0?'positive':'negative'}">${ytdYoy!=null?fmtPct(ytdYoy)+' 同比':'N/A'}</div></div><div class="kpi-card"><div class="kpi-label">${latestMonthLabel} ${latestYear}</div><div class="kpi-value">${fmt(latestMonthVal)}</div><div class="kpi-change ${latestMoYoy>=0?'positive':'negative'}">${latestMoYoy!=null?fmtPct(latestMoYoy)+' 同比':''}</div></div><div class="kpi-card"><div class="kpi-label">环比</div><div class="kpi-value">${momChange!=null?fmtPct(momChange):'-'}</div></div><div class="kpi-card"><div class="kpi-label">上年同期</div><div class="kpi-value">${prevYear?fmt(totalPrev):'-'}</div></div>`;
+    destroyChart('chart-gms-'+mpId);charts['chart-gms-'+mpId]=new Chart(document.getElementById('chart-gms-'+mpId).getContext('2d'),{type:'bar',data:{labels:sortedKeys.map(k=>{const[y,m]=k.split('-');return MN[parseInt(m)]+' '+y;}),datasets:[{data:sortedKeys.map(k=>monthly[k]),backgroundColor:sortedKeys.map(k=>parseInt(k.split('-')[0])===latestYear?mpCfg.color:mpCfg.color+'66'),borderRadius:3}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>fmt(c.raw)}}},scales:{y:{ticks:{callback:v=>fmt(v)}},x:{ticks:{maxRotation:45,font:{size:8}}}}}});
+    const yoyL=[],yoyD=[];sortedKeys.forEach(k=>{const[y,m]=k.split('-').map(Number);const pk=(y-1)+'-'+String(m).padStart(2,'0');if(monthly[pk]){yoyL.push(MN[m]+' '+y);yoyD.push(((monthly[k]/monthly[pk])-1)*100);}});
+    destroyChart('chart-yoy-'+mpId);charts['chart-yoy-'+mpId]=new Chart(document.getElementById('chart-yoy-'+mpId).getContext('2d'),{type:'bar',data:{labels:yoyL,datasets:[{data:yoyD,backgroundColor:yoyD.map(v=>v>=0?'#067D6288':'#D1321288'),borderRadius:3}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>fmtPct(c.raw)}}},scales:{y:{ticks:{callback:v=>v.toFixed(0)+'%'}},x:{ticks:{maxRotation:45,font:{size:8}}}}}});
+    destroyChart('chart-overlay-'+mpId);charts['chart-overlay-'+mpId]=new Chart(document.getElementById('chart-overlay-'+mpId).getContext('2d'),{type:'line',data:{labels:months.map(m=>MN[m]),datasets:years.map((yr,i)=>({label:String(yr),data:months.map(m=>{const k=yr+'-'+String(m).padStart(2,'0');return monthly[k]||null;}),borderColor:mpCfg.color+(i===years.length-1?'FF':'77'),borderWidth:i===years.length-1?2.5:1.5,borderDash:i<years.length-1?[5,3]:[],tension:.3,pointRadius:i===years.length-1?3:2,fill:i===years.length-1,backgroundColor:mpCfg.color+'22'}))},options:{responsive:true,maintainAspectRatio:false,plugins:{tooltip:{callbacks:{label:c=>c.dataset.label+': '+fmt(c.raw)}}},scales:{y:{ticks:{callback:v=>fmt(v)}}}}});
+  }
+  if(brandData&&brandData.length){
+    const bm=getBrandColMap(brandData),ba={};brandData.forEach(r=>{const b=String(r[bm.brand]||'').trim();let g=parseFloat(String(r[bm.gms]||'0').replace(/[,$]/g,''));if(b&&!isNaN(g))ba[b]=(ba[b]||0)+g;});
+    const sorted=Object.entries(ba).sort((a,b)=>b[1]-a[1]),total=sorted.reduce((s,e)=>s+e[1],0),top15=sorted.slice(0,15);
+    destroyChart('chart-brand-'+mpId);charts['chart-brand-'+mpId]=new Chart(document.getElementById('chart-brand-'+mpId).getContext('2d'),{type:'bar',data:{labels:top15.map(e=>e[0].length>18?e[0].substring(0,16)+'..':e[0]),datasets:[{data:top15.map(e=>e[1]),backgroundColor:mpCfg.color+'AA',borderRadius:3}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>fmt(c.raw)+' ('+(c.raw/total*100).toFixed(1)+'%)'}}},scales:{x:{ticks:{callback:v=>fmt(v)}}}}});
+    const top20=sorted.slice(0,20),maxS=top20.length?(top20[0][1]/total*100):1;
+    let html='<table class="brand-table"><thead><tr><th>#</th><th>品牌</th><th>GMS</th><th>份额</th><th></th></tr></thead><tbody>';
+    top20.forEach((e,i)=>{const sh=(e[1]/total*100);html+=`<tr><td>${i+1}</td><td>${e[0]}</td><td class="num">${fmt(e[1])}</td><td class="num">${sh.toFixed(1)}%</td><td><span class="share-bar" style="width:${(sh/maxS)*100}px"></span></td></tr>`;});
+    html+='</tbody></table>';document.getElementById('brandtable-'+mpId).innerHTML=html;
+  }
+}
+
+function renderExecDashboard(){
+  try{
+  const loaded=MPS.filter(mp=>store[mp.id].gms);
+  const dash=document.getElementById('execDashboard');
+  if(loaded.length<1){dash.classList.remove('visible');return;}
+  dash.classList.add('visible');
+  const mpM={},allMonths=new Set(),allYears=new Set();
+  MPS.forEach(mp=>{if(!store[mp.id].gms)return;mpM[mp.id]=buildMonthly(store[mp.id].gms);Object.keys(mpM[mp.id]).forEach(k=>{allMonths.add(k);allYears.add(parseInt(k.split('-')[0]));});});
+  const sortedM=[...allMonths].sort(),yearsArr=[...allYears].sort();
+  const latestYear=yearsArr[yearsArr.length-1],prevYear=yearsArr.length>1?yearsArr[yearsArr.length-2]:null;
+  const latestYrMonths=sortedM.filter(k=>parseInt(k.split('-')[0])===latestYear);
+  const lmSet=new Set(latestYrMonths.map(k=>k.split('-')[1]));
+  const yearPairs=[];for(let i=1;i<yearsArr.length;i++)yearPairs.push({cur:yearsArr[i],prev:yearsArr[i-1]});
+
+  // Per-MP stats
+  const mpStats={};let eu5Lt=0,eu5Pv=0;
+  MPS.forEach(mp=>{
+    if(!mpM[mp.id])return;let lt=0,pv=0;
+    Object.entries(mpM[mp.id]).forEach(([k,v])=>{const[yS,mS]=k.split('-');if(parseInt(yS)===latestYear)lt+=v;if(parseInt(yS)===prevYear&&lmSet.has(mS))pv+=v;});
+    const monthYoy={};latestYrMonths.forEach(k=>{const mS=k.split('-')[1],pk=prevYear+'-'+mS;const cv=mpM[mp.id][k]||0,pvv=mpM[mp.id][pk]||0;monthYoy[mS]=pvv?((cv/pvv-1)*100):null;});
+    const last3=latestYrMonths.slice(-3).map(k=>mpM[mp.id][k]||0);
+    const trend=last3.length>=3?(last3[2]>last3[1]&&last3[1]>last3[0]?'accelerating':last3[2]<last3[1]&&last3[1]<last3[0]?'decelerating':'mixed'):'mixed';
+    const yoyVals=Object.values(monthYoy).filter(v=>v!=null);
+    const stdDev=yoyVals.length>1?Math.sqrt(yoyVals.reduce((s,v)=>s+Math.pow(v-yoyVals.reduce((a,b)=>a+b,0)/yoyVals.length,2),0)/yoyVals.length):0;
+    mpStats[mp.id]={latest:lt,prev:pv,yoy:pv?((lt/pv-1)*100):null,monthYoy,trend,stdDev};
+    eu5Lt+=lt;eu5Pv+=pv;
+  });
+  const eu5Yoy=eu5Pv?((eu5Lt/eu5Pv-1)*100):null;
+
+  // 1. KPI cards
+  let kpiHtml='';
+  MPS.forEach(mp=>{
+    if(!mpStats[mp.id]){kpiHtml+=`<div class="exec-kpi" style="background:#ccc;opacity:.4"><span class="kpi-flag">${mp.flag}</span><div class="kpi-val">-</div></div>`;return;}
+    const s=mpStats[mp.id],share=eu5Lt?(s.latest/eu5Lt*100).toFixed(1):'0';
+    kpiHtml+=`<div class="exec-kpi" style="background:${mp.color}"><span class="kpi-flag">${mp.flag}</span><div class="kpi-mp">${mp.id.toUpperCase()}</div><div class="kpi-val">${fmt(s.latest)}</div><span class="kpi-yoy">${s.yoy!=null?fmtPct(s.yoy):'-'}</span><div class="kpi-share">占EU5 ${share}%</div></div>`;
+  });
+  document.getElementById('execKpiRow').innerHTML=kpiHtml;
+
+  // 2. Heatmap (per year, skip earliest)
+  let hmHtml='';
+  yearsArr.forEach((yr,yi)=>{
+    if(yi===0)return;
+    const prevYr=yearsArr[yi-1];
+    const yrMonths=[...new Set(sortedM.filter(k=>parseInt(k.split('-')[0])===yr).map(k=>k.split('-')[1]))].sort();
+    if(!yrMonths.length)return;
+    hmHtml+=`<div style="flex:1;min-width:0"><div style="font-size:11px;font-weight:700;color:var(--amazon-blue);margin-bottom:4px">${yr} vs ${prevYr} 同比</div>`;
+    hmHtml+=`<table class="heatmap"><thead><tr><th>站点</th>`;
+    yrMonths.forEach(m=>{hmHtml+=`<th>${MN[parseInt(m)]}</th>`;});
+    hmHtml+=`<th>YTD</th><th>同比</th></tr></thead><tbody>`;
+    MPS.forEach(mp=>{
+      if(!mpM[mp.id])return;
+      hmHtml+=`<tr><td class="mp-col">${mp.flag} ${mp.id.toUpperCase()}</td>`;
+      let ytdC=0,ytdP=0;
+      yrMonths.forEach(m=>{
+        const ck=yr+'-'+m,pk=prevYr+'-'+m;
+        const cv=mpM[mp.id][ck]||0,pv=mpM[mp.id][pk]||0;
+        ytdC+=cv;ytdP+=pv;
+        const yoy=pv?((cv/pv-1)*100):null;
+        const{bg,color}=cv===0?{bg:'#F5F5F5',color:'#999'}:(yoy!=null?heatColor(yoy):{bg:'#fff',color:'#333'});
+        let cell=fmtShort(cv);if(yoy!=null)cell+=`<br><span style="font-size:8px">${fmtPct(yoy)}</span>`;
+        hmHtml+=`<td style="background:${bg};color:${color}">${cv?cell:'-'}</td>`;
+      });
+      hmHtml+=`<td style="font-weight:700;background:#FAFAFA">${fmtShort(ytdC)}</td>`;
+      const ytdYoy=ytdP?((ytdC/ytdP-1)*100):null;
+      const{bg:yb,color:yc}=heatColor(ytdYoy);
+      hmHtml+=`<td style="background:${yb};color:${yc};font-weight:700">${ytdYoy!=null?fmtPct(ytdYoy):'-'}</td></tr>`;
+    });
+    // EU5 row
+    hmHtml+=`<tr><td class="mp-col" style="font-weight:800">EU5</td>`;
+    let e5c=0,e5p=0;
+    yrMonths.forEach(m=>{
+      let lS=0,pS=0;MPS.forEach(mp=>{if(!mpM[mp.id])return;lS+=(mpM[mp.id][yr+'-'+m]||0);pS+=(mpM[mp.id][prevYr+'-'+m]||0);});
+      e5c+=lS;e5p+=pS;const yoy=pS?((lS/pS-1)*100):null;
+      const{bg,color}=lS===0?{bg:'#F5F5F5',color:'#999'}:(yoy!=null?heatColor(yoy):{bg:'#fff',color:'#333'});
+      let cell=fmtShort(lS);if(yoy!=null)cell+=`<br><span style="font-size:8px">${fmtPct(yoy)}</span>`;
+      hmHtml+=`<td style="background:${bg};color:${color};font-weight:700">${lS?cell:'-'}</td>`;
+    });
+    hmHtml+=`<td style="font-weight:800;background:#FAFAFA">${fmtShort(e5c)}</td>`;
+    const e5yoy=e5p?((e5c/e5p-1)*100):null;const{bg:eb,color:ec}=heatColor(e5yoy);
+    hmHtml+=`<td style="background:${eb};color:${ec};font-weight:800">${e5yoy!=null?fmtPct(e5yoy):'-'}</td></tr>`;
+    hmHtml+=`</tbody></table></div>`;
+  });
+  document.getElementById('heatmapContainer').innerHTML=hmHtml;
+
+  // 3. Scorecards
+  let scHtml='';
+  MPS.forEach(mp=>{
+    if(!mpStats[mp.id]){scHtml+=`<div class="scorecard" style="opacity:.3"><div class="sc-header">${mp.flag} ${mp.id.toUpperCase()}</div></div>`;return;}
+    const s=mpStats[mp.id],share=eu5Lt?(s.latest/eu5Lt*100).toFixed(1):'0';
+    const yoyVals=Object.values(s.monthYoy).filter(v=>v!=null);
+    const latestMoYoy=yoyVals.length?yoyVals[yoyVals.length-1]:null;
+    const latestMoKey=[...lmSet].sort().pop();
+    const latestMoName=latestMoKey?MN[parseInt(latestMoKey)]:'';
+    let top5Share=0,topBrandName='-';
+    if(store[mp.id].brand&&store[mp.id].brand.length){
+      const bm=getBrandColMap(store[mp.id].brand),ba={};
+      store[mp.id].brand.forEach(r=>{const b=String(r[bm.brand]||'').trim();let g=parseFloat(String(r[bm.gms]||'0').replace(/[,$]/g,''));if(b&&!isNaN(g))ba[b]=(ba[b]||0)+g;});
+      const sorted=Object.entries(ba).sort((a,b)=>b[1]-a[1]),total=sorted.reduce((s,e)=>s+e[1],0);
+      if(sorted.length)topBrandName=sorted[0][0];
+      if(sorted.length>=10)top5Share=sorted.slice(0,10).reduce((s,e)=>s+e[1],0)/total*100;
+    }
+    const nonTop5=(100-top5Share).toFixed(0);
+    let competLevel='',competClass='';
+    if(top5Share>=70){competLevel='激烈';competClass='potential-low';}
+    else if(top5Share>=50){competLevel='中等';competClass='potential-mid';}
+    else{competLevel='宽松';competClass='potential-high';}
+    let verdict='',verdictClass='';
+    if(s.yoy!=null){
+      if(s.yoy>=10&&top5Share<60){verdict='强烈推荐';verdictClass='potential-high';}
+      else if(s.yoy>=5&&top5Share<70){verdict='值得投入';verdictClass='potential-high';}
+      else if(s.yoy>=0&&parseFloat(share)<=15){verdict='可以尝试';verdictClass='potential-stable';}
+      else if(s.yoy>=0){verdict='稳健持有';verdictClass='potential-stable';}
+      else if(s.yoy>=-5){verdict='观望为主';verdictClass='potential-mid';}
+      else{verdict='暂不建议';verdictClass='potential-low';}
+    }
+    const trendIcon=s.trend==='accelerating'?'📈':s.trend==='decelerating'?'📉':'➡️';
+    scHtml+=`<div class="scorecard" style="border-top:3px solid ${mp.color}"><div class="sc-header">${mp.flag} ${mp.id.toUpperCase()} · ${mp.name}</div>
+      <div class="sc-row"><span class="sc-label">市场体量</span><span class="sc-val">${fmt(s.latest)} <span style="font-size:8px;color:#999">占${share}%</span></span></div>
+      <div class="sc-row"><span class="sc-label">YTD 同比</span><span class="sc-val ${s.yoy>=0?'positive':'negative'}">${s.yoy!=null?fmtPct(s.yoy):'-'}</span></div>
+      <div class="sc-row"><span class="sc-label">${latestMoName}月同比</span><span class="sc-val ${latestMoYoy!=null&&latestMoYoy>=0?'positive':'negative'}">${latestMoYoy!=null?fmtPct(latestMoYoy):'-'}</span></div>
+      <div class="sc-row"><span class="sc-label">趋势</span><span class="sc-val">${trendIcon}</span></div>
+      <div class="sc-row" style="border-top:1px solid #ddd;padding-top:4px;margin-top:2px"><span class="sc-label">竞争度</span><span class="potential-tag ${competClass}">${competLevel}</span></div>
+      <div class="sc-row"><span class="sc-label">头部外空间</span><span class="sc-val">${nonTop5}%</span></div>
+      <div class="sc-row"><span class="sc-label">龙头</span><span class="sc-val" style="font-size:9px">${topBrandName.length>12?topBrandName.substring(0,11)+'..':topBrandName}</span></div>
+      <div class="sc-row" style="border-top:1px solid #ddd;padding-top:4px;margin-top:2px"><span class="sc-label">建议</span><span class="potential-tag ${verdictClass}">${verdict}</span></div>
+    </div>`;
+  });
+  document.getElementById('scorecardGrid').innerHTML=scHtml;
+
+  // 4. Charts
+  destroyChart('execStackedChart');
+  const mpLabels=MPS.filter(mp=>mpStats[mp.id]).map(mp=>mp.flag+' '+mp.id.toUpperCase());
+  const mpColors=MPS.filter(mp=>mpStats[mp.id]).map(mp=>mp.color);
+  const barDS=yearsArr.map((yr,yi)=>{
+    const alpha=yr===latestYear?'CC':(yr===prevYear?'77':'44');
+    const vals=MPS.filter(mp=>mpStats[mp.id]).map(mp=>{let t=0;[...lmSet].forEach(m=>{t+=(mpM[mp.id]&&mpM[mp.id][yr+'-'+m])||0;});return t;});
+    return{label:String(yr),data:vals,backgroundColor:mpColors.map(c=>c+alpha),borderRadius:3};
+  });
+  charts['execStackedChart']=new Chart(document.getElementById('execStackedChart').getContext('2d'),{type:'bar',data:{labels:mpLabels,datasets:barDS},options:{responsive:true,maintainAspectRatio:false,plugins:{tooltip:{callbacks:{label:c=>c.dataset.label+': '+fmt(c.raw)}}},scales:{y:{ticks:{callback:v=>fmt(v)}}}}});
+
+  destroyChart('execBrandChart');
+  const allBrands={},brandByMp={};
+  MPS.forEach(mp=>{if(!store[mp.id].brand)return;brandByMp[mp.id]={};const bm=getBrandColMap(store[mp.id].brand);store[mp.id].brand.forEach(r=>{const b=String(r[bm.brand]||'').trim();let g=parseFloat(String(r[bm.gms]||'0').replace(/[,$]/g,''));if(!b||isNaN(g))return;if(!allBrands[b])allBrands[b]={};allBrands[b][mp.id]=(allBrands[b][mp.id]||0)+g;brandByMp[mp.id][b]=(brandByMp[mp.id][b]||0)+g;});});
+  const brandMaxGms=Object.entries(allBrands).map(([b,mps])=>({brand:b,totalAcross:Object.values(mps).reduce((a,v)=>a+v,0),coverage:Object.keys(mps).length})).sort((a,b)=>b.totalAcross-a.totalAcross);
+  const concLabels=[],concTop5=[],concRest=[],concColors=[];
+  MPS.forEach(mp=>{if(!brandByMp[mp.id])return;const sorted=Object.entries(brandByMp[mp.id]).sort((a,b)=>b[1]-a[1]);const total=sorted.reduce((s,e)=>s+e[1],0);const t5=sorted.length>=10?sorted.slice(0,10).reduce((s,e)=>s+e[1],0)/total*100:0;concLabels.push(mp.flag+' '+mp.id.toUpperCase());concTop5.push(t5);concRest.push(100-t5);concColors.push(mp.color);});
+  if(concLabels.length){charts['execBrandChart']=new Chart(document.getElementById('execBrandChart').getContext('2d'),{type:'bar',data:{labels:concLabels,datasets:[{label:'Top10 品牌',data:concTop5,backgroundColor:concColors.map(c=>c+'CC'),borderRadius:3},{label:'其他空间',data:concRest,backgroundColor:concColors.map(c=>c+'33'),borderRadius:3}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{tooltip:{callbacks:{label:c=>c.dataset.label+': '+c.raw.toFixed(1)+'%'}},legend:{position:'bottom',labels:{font:{size:9}}}},scales:{x:{stacked:true,max:100,ticks:{callback:v=>v+'%'}},y:{stacked:true}}}});}
+
+  // 5. Insight Cards
+  try{
+  const ranked=MPS.filter(mp=>mpStats[mp.id]).sort((a,b)=>mpStats[b.id].latest-mpStats[a.id].latest);
+  const multiYoy=yearPairs.map(yp=>{const ms=sortedM.filter(k=>parseInt(k.split('-')[0])===yp.cur).map(k=>k.split('-')[1]).filter(m=>MPS.some(mp=>mpM[mp.id]&&mpM[mp.id][yp.prev+'-'+m]));let c=0,p=0;MPS.forEach(mp=>{if(!mpM[mp.id])return;ms.forEach(m=>{c+=(mpM[mp.id][yp.cur+'-'+m]||0);p+=(mpM[mp.id][yp.prev+'-'+m]||0);});});return{cur:yp.cur,prev:yp.prev,yoy:p?((c/p-1)*100):null,curT:c,prevT:p};}).filter(v=>v.yoy!=null);
+  const mpConc={};
+  MPS.forEach(mp=>{if(!brandByMp[mp.id])return;const sorted=Object.entries(brandByMp[mp.id]).sort((a,b)=>b[1]-a[1]);const total=sorted.reduce((s,e)=>s+e[1],0);const t5sh=sorted.length>=10?sorted.slice(0,10).reduce((s,e)=>s+e[1],0)/total*100:0;mpConc[mp.id]={total,t5sh,top1:sorted[0]?sorted[0][0]:'-',top3:sorted.slice(0,3),count:sorted.length};});
+  const cV=Object.values(mpConc);const avgT5=cV.length?cV.reduce((s,c)=>s+c.t5sh,0)/cV.length:0;
+  const prevYrMonths=sortedM.filter(k=>parseInt(k.split('-')[0])===prevYear);
+  let peakMs=[],troughMs=[];
+  if(prevYrMonths.length>=6){const pvBM={};prevYrMonths.forEach(k=>{const m=k.split('-')[1];let t=0;MPS.forEach(mp=>{if(mpM[mp.id])t+=(mpM[mp.id][k]||0);});pvBM[m]=t;});const pvE=Object.entries(pvBM).sort((a,b)=>b[1]-a[1]);peakMs=pvE.slice(0,3).map(e=>MN[parseInt(e[0])]);troughMs=pvE.slice(-3).map(e=>MN[parseInt(e[0])]);}
+  const topBrand=brandMaxGms.length?brandMaxGms[0]:null;
+  const singleMpBrands=brandMaxGms.filter(e=>e.coverage===1);
+  const lastDM=parseInt(latestYrMonths[latestYrMonths.length-1].split('-')[1]);
+
+  let h='<div class="insight-grid">';
+
+  // Card 1: 市场概况与规模
+  h+=`<div class="insight-card"><div class="card-header" style="background:linear-gradient(135deg,#1A73E8,#4285F4)"><span class="card-icon">📊</span><div class="card-titles"><h4>市场概况与规模</h4><div class="card-sub">这个品类有多大？在涨还是跌？</div></div></div><div class="card-body"><ul>`;
+  h+=`<li><b>市场体量:</b> EU5 YTD ${fmt(eu5Lt)}，年化约 <span class="highlight">${fmt(eu5Lt/(latestYrMonths.length||1)*12)}</span></li>`;
+  multiYoy.forEach(v=>{h+=`<li><b>${v.cur} vs ${v.prev}:</b> ${fmt(v.prevT)} → ${fmt(v.curT)}（<span class="${v.yoy>=0?'highlight':''}" style="${v.yoy<0?'color:var(--danger)':''}">${fmtPct(v.yoy)}</span>）</li>`;});
+  if(multiYoy.length>=2){const acc=multiYoy[multiYoy.length-1].yoy>multiYoy[multiYoy.length-2].yoy;h+=`<li><b>增长趋势:</b> ${acc?'<span class="tag-green">增速加快</span>':'<span class="tag-red">增速放缓</span>'}</li>`;}
+  h+=`<li><b>体量排名:</b> ${ranked.map(mp=>`${mp.flag}${mp.id.toUpperCase()} ${fmt(mpStats[mp.id].latest)}`).join(' > ')}</li>`;
+  h+=`</ul></div></div>`;
+
+  // Card 2: 需求与趋势
+  h+=`<div class="insight-card"><div class="card-header" style="background:linear-gradient(135deg,#0D7377,#14A3A8)"><span class="card-icon">📈</span><div class="card-titles"><h4>需求与趋势</h4><div class="card-sub">什么时候卖得好？现在趋势如何？</div></div></div><div class="card-body"><ul>`;
+  if(peakMs.length){h+=`<li><b>季节性:</b> 旺季 <span class="highlight">${peakMs.join('/')}</span>，淡季 ${troughMs.join('/')}</li>`;}
+  if(latestYrMonths.length>=2){
+    const lt2=latestYrMonths.slice(-2);let eL=0,eP=0;
+    MPS.forEach(mp=>{if(mpM[mp.id]){eL+=(mpM[mp.id][lt2[1]]||0);eP+=(mpM[mp.id][lt2[0]]||0);}});
+    const mom=eP?((eL/eP-1)*100):null;
+    if(mom!=null)h+=`<li><b>最新环比:</b> ${MN[parseInt(lt2[0].split('-')[1])]}→${MN[parseInt(lt2[1].split('-')[1])]} <span class="${mom>=0?'highlight':''}" style="${mom<0?'color:var(--danger)':''}">${fmtPct(mom)}</span></li>`;
+  }
+  ranked.forEach(mp=>{const s=mpStats[mp.id];const tr=s.trend==='accelerating'?'<span class="tag-green">加速</span>':s.trend==='decelerating'?'<span class="tag-red">放缓</span>':'<span class="tag-blue">平稳</span>';h+=`<li>${mp.flag} ${mp.id.toUpperCase()}: ${s.yoy!=null?fmtPct(s.yoy)+' 同比':'-'} ${tr}</li>`;});
+  h+=`</ul></div></div>`;
+
+  // Card 3: 竞争格局
+  h+=`<div class="insight-card"><div class="card-header" style="background:linear-gradient(135deg,#5C6BC0,#7986CB)"><span class="card-icon">🏷️</span><div class="card-titles"><h4>竞争格局</h4><div class="card-sub">头部品牌有多强？我能打得过吗？</div></div></div><div class="card-body"><ul>`;
+  h+=`<li><b>集中度:</b> Top10 平均占 <span class="highlight">${avgT5.toFixed(0)}%</span> ${avgT5>=50?'<span class="tag-red">头部主导</span>':'<span class="tag-green">格局开放</span>'}</li>`;
+  if(topBrand)h+=`<li><b>龙头:</b> ${topBrand.brand}（覆盖${topBrand.coverage}站）</li>`;
+  MPS.forEach(mp=>{if(!mpConc[mp.id]||mpConc[mp.id].top3.length<3)return;const c=mpConc[mp.id];const t3sh=c.top3.reduce((s,e)=>s+e[1],0)/c.total*100;h+=`<li>${mp.flag} ${mp.id.toUpperCase()}: ${c.top3.map(e=>e[0]).join(' / ')} <span style="color:#999">(${t3sh.toFixed(0)}%)</span></li>`;});
+  h+=`</ul></div></div>`;
+
+  // Card 4: 机会点
+  h+=`<div class="insight-card"><div class="card-header" style="background:linear-gradient(135deg,#2E7D32,#43A047)"><span class="card-icon">✅</span><div class="card-titles"><h4>机会点</h4><div class="card-sub">哪里有增长红利？哪些站点值得进？</div></div></div><div class="card-body"><ul>`;
+  const growMPs=ranked.filter(mp=>mpStats[mp.id].yoy!=null&&mpStats[mp.id].yoy>5);
+  if(growMPs.length)h+=`<li><b>增长热点:</b> ${growMPs.map(mp=>`${mp.flag}${mp.id.toUpperCase()}(${fmtPct(mpStats[mp.id].yoy)})`).join(', ')}</li>`;
+  if(avgT5<50)h+=`<li><b>竞争空间:</b> 超过 ${(100-avgT5).toFixed(0)}% 市场属于中小品牌</li>`;
+  if(singleMpBrands.length>brandMaxGms.length*0.4)h+=`<li><b>Pan-EU:</b> ${(singleMpBrands.length/brandMaxGms.length*100).toFixed(0)}% 品牌仅单站销售，跨站扩展空间大</li>`;
+  const nextPeaks=peakMs.filter(m=>MN.indexOf(m)>lastDM);
+  if(nextPeaks.length)h+=`<li><b>旺季窗口:</b> ${nextPeaks.join('/')} 即将到来</li>`;
+  const smMPs=ranked.filter(mp=>{const sh=eu5Lt?(mpStats[mp.id].latest/eu5Lt*100):0;return sh<=15&&mpStats[mp.id].yoy!=null&&mpStats[mp.id].yoy>=0;});
+  if(smMPs.length)h+=`<li><b>蓝海站点:</b> ${smMPs.map(mp=>mp.flag+mp.id.toUpperCase()).join(', ')}（体量小竞争少）</li>`;
+  h+=`</ul></div></div>`;
+
+  // Card 5: 风险与挑战
+  h+=`<div class="insight-card"><div class="card-header" style="background:linear-gradient(135deg,#C62828,#E53935)"><span class="card-icon">⚠️</span><div class="card-titles"><h4>风险与挑战</h4><div class="card-sub">有什么坑？备货要注意什么？</div></div></div><div class="card-body"><ul>`;
+  if(topBrand){const ts=Object.entries(allBrands[topBrand.brand]).map(([mp,g])=>mpConc[mp]?(g/mpConc[mp].total*100):0);h+=`<li><b>龙头压制:</b> ${topBrand.brand} 最高单站份额 ${Math.max(...ts).toFixed(0)}%</li>`;}
+  if(multiYoy.length>=2&&multiYoy[multiYoy.length-1].yoy<multiYoy[multiYoy.length-2].yoy)h+=`<li><b>增速放缓:</b> ${fmtPct(multiYoy[multiYoy.length-2].yoy)} → ${fmtPct(multiYoy[multiYoy.length-1].yoy)}，获客成本可能上升</li>`;
+  const declMPs=ranked.filter(mp=>mpStats[mp.id].yoy!=null&&mpStats[mp.id].yoy<0);
+  if(declMPs.length)h+=`<li><b>下滑站点:</b> ${declMPs.map(mp=>`${mp.flag}${mp.id.toUpperCase()}(${fmtPct(mpStats[mp.id].yoy)})`).join(', ')}</li>`;
+  const nextTroughs=troughMs.filter(m=>{const mi=MN.indexOf(m);return mi>lastDM&&mi<=lastDM+3;});
+  if(nextTroughs.length)h+=`<li><b>淡季预警:</b> ${nextTroughs.join('/')} 为历史淡季</li>`;
+  h+=`</ul></div></div>`;
+
+  // Card 6: 市场进入建议
+  h+=`<div class="insight-card"><div class="card-header" style="background:linear-gradient(135deg,#E65100,#FF9800)"><span class="card-icon">🎯</span><div class="card-titles"><h4>市场进入建议</h4><div class="card-sub">AM 视角：怎么进？怎么打？怎么备货？</div></div></div><div class="card-body"><ul>`;
+  const hiMPs=ranked.filter(mp=>mpStats[mp.id].yoy!=null&&mpStats[mp.id].yoy>=8);
+  const bgMPs=ranked.filter(mp=>{const sh=eu5Lt?(mpStats[mp.id].latest/eu5Lt*100):0;return sh>=25;});
+  if(hiMPs.length)h+=`<li><b>首发站点:</b> ${hiMPs.map(mp=>mp.flag+mp.id.toUpperCase()).join(', ')} <span class="tag-green">增长快</span></li>`;
+  if(bgMPs.length)h+=`<li><b>主力站点:</b> ${bgMPs.map(mp=>mp.flag+mp.id.toUpperCase()).join(', ')} <span class="tag-blue">体量大</span></li>`;
+  if(smMPs.length)h+=`<li><b>测试站点:</b> ${smMPs.map(mp=>mp.flag+mp.id.toUpperCase()).join(', ')} <span class="tag-yellow">低成本</span></li>`;
+  if(avgT5>=40)h+=`<li><b>差异化:</b> 头部主打标准品，从细分场景/功能升级/套装切入</li>`;
+  else h+=`<li><b>策略:</b> 市场分散，产品力+运营精细化即可上位</li>`;
+  if(peakMs.length)h+=`<li><b>备货:</b> 旺季(${peakMs.join('/')})提前6-8周，淡季控库存</li>`;
+  h+=`<li><b>Pan-EU:</b> ${ranked.map(mp=>mp.flag+mp.id.toUpperCase()).join(' → ')}</li>`;
+  const nxMs=[];for(let i=1;i<=3&&lastDM+i<=12;i++)nxMs.push(lastDM+i);
+  if(nxMs.length&&prevYrMonths.length>=6){h+=`<li><b>备货参考:</b> ${nxMs.map(m=>{const pk=prevYear+'-'+String(m).padStart(2,'0');let t=0;MPS.forEach(mp=>{if(mpM[mp.id])t+=(mpM[mp.id][pk]||0);});return MN[m]+' '+fmt(t);}).join(', ')}</li>`;}
+  h+=`</ul></div></div>`;
+
+  h+=`</div>`;
+
+  // Helper: build inventory table
+  // For latestYear: missing months fallback to prevYear data (marked as forecast)
+  function buildInvTable(mos,yr,thColor,is1pct){
+    let t='<table style="width:100%;border-collapse:collapse;font-size:9px;margin-top:3px"><thead><tr style="background:'+thColor+';color:#fff"><th style="padding:3px 4px;text-align:left">站点</th>';
+    mos.forEach(m=>{t+=`<th style="padding:3px 4px;text-align:center">${MN[parseInt(m)]}</th>`;});
+    t+='<th style="padding:3px 4px;text-align:center">合计</th></tr></thead><tbody>';
+    const useFallback=(yr===latestYear&&prevYear);
+    MPS.forEach(mp=>{
+      if(!mpM[mp.id])return;
+      t+=`<tr><td style="padding:2px 4px;font-weight:700;border-bottom:1px solid #eee">${mp.flag}${mp.id.toUpperCase()}</td>`;
+      let rt=0;
+      mos.forEach(m=>{
+        let v=mpM[mp.id][yr+'-'+m]||0;
+        let isForecast=false;
+        if(v===0&&useFallback&&mpM[mp.id][prevYear+'-'+m]){v=mpM[mp.id][prevYear+'-'+m];isForecast=true;}
+        if(is1pct)v=is1pct==='round'?Math.round(v*0.01):v*0.01;
+        rt+=v;
+        const style=isForecast?'padding:2px 4px;text-align:center;border-bottom:1px solid #eee;color:#888;font-style:italic':'padding:2px 4px;text-align:center;border-bottom:1px solid #eee';
+        t+=`<td style="${style}">${v?fmtShort(v):'-'}${isForecast&&v?'*':''}</td>`;
+      });
+      t+=`<td style="padding:2px 4px;text-align:center;font-weight:700;border-bottom:1px solid #eee;background:${is1pct?'#fff3e0':'#f5f5f5'}">${fmtShort(rt)}</td></tr>`;
+    });
+    t+='<tr style="font-weight:800"><td style="padding:2px 4px;border-top:2px solid '+thColor+'">EU5</td>';
+    let gt=0;
+    mos.forEach(m=>{
+      let s=0;
+      MPS.forEach(mp=>{if(mpM[mp.id]){let v=mpM[mp.id][yr+'-'+m]||0;if(v===0&&useFallback&&mpM[mp.id][prevYear+'-'+m])v=mpM[mp.id][prevYear+'-'+m];if(is1pct)v=is1pct==='round'?Math.round(v*0.01):v*0.01;s+=v;}});
+      gt+=s;t+=`<td style="padding:2px 4px;text-align:center;border-top:2px solid ${thColor}">${s?fmtShort(s):'-'}</td>`;
+    });
+    t+=`<td style="padding:2px 4px;text-align:center;border-top:2px solid ${thColor};background:${is1pct?'#fff3e0':'#f5f5f5'}">${fmtShort(gt)}</td></tr></tbody></table>`;
+    if(useFallback)t+=`<div style="font-size:8px;color:#999;margin-top:2px">* 斜体为预测值（基于 ${prevYear} 同期数据）</div>`;
+    return t;
+  }
+
+  // Summary one-liner
+  const summaryParts=[];
+  if(eu5Yoy!=null)summaryParts.push(eu5Yoy>=0?'品类正增长，市场有空间':'品类承压，需精准切入');
+  if(avgT5<50)summaryParts.push('竞争格局开放');else summaryParts.push('头部集中，需差异化');
+  if(singleMpBrands.length>brandMaxGms.length*0.4)summaryParts.push('Pan-EU 扩展机会大');
+
+  // ===== 备货建议（全宽） =====
+  h+=`<div style="background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.06);border:1px solid #E8E8E8;margin-bottom:14px">`;
+  h+=`<div style="padding:10px 14px;color:#fff;display:flex;align-items:center;gap:8px;background:linear-gradient(135deg,#1565C0,#1E88E5)"><span style="font-size:18px">📦</span><div><div style="font-size:12px;font-weight:700">备货建议</div><div style="font-size:9px;opacity:.8">基于品类 ITK 数据，假设 1% 市占率的月度销售额参考</div></div></div>`;
+  h+=`<div style="padding:14px">`;
+  const invYears=yearsArr.filter(y=>y>=prevYear);
+  // Unified month columns: union of all months across invYears
+  const allInvMos=new Set();
+  invYears.forEach(yr=>{sortedM.filter(k=>parseInt(k.split('-')[0])===yr).forEach(k=>allInvMos.add(k.split('-')[1]));});
+  const unifiedMos=[...allInvMos].sort();
+  invYears.forEach(yr=>{
+    h+=`<div style="font-size:10px;font-weight:700;color:#333;margin-top:${yr===invYears[0]?'0':'12'}px">${yr} 年品类 ITK（市场总量）</div>`;
+    h+=buildInvTable(unifiedMos,yr,'#1565C0',false);
+    if(yr===latestYear){
+      h+=`<div style="font-size:10px;font-weight:700;color:#E65100;margin-top:6px">→ 假设 1% 市占率，你的月度销售额</div>`;
+      h+=buildInvTable(unifiedMos,yr,'#E65100',true);
+    }
+  });
+  h+=`</div></div>`;
+
+  h+=`<div class="insight-summary">${summaryParts.join(' · ')}</div>`;
+
+  document.getElementById('execInsight').innerHTML=h;
+  }catch(e){console.error('Insight render error:',e);document.getElementById('execInsight').innerHTML='<div style="color:red;padding:12px">Insight 渲染出错: '+e.message+'</div>';}
+  }catch(e2){console.error('Dashboard render error:',e2);}
+}
+</script>
+</body>
+</html>
