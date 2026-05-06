@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Listing 优化建议可视化工具</title>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--a:#ff6a00;--bg:#f4f5f7;--c:#fff;--t:#1a1a1a;--s:#777;--bd:#e4e4e4;--g:#1a8c2d;--r:#c62828}
+body{font-family:'Segoe UI','Microsoft YaHei',sans-serif;background:var(--bg);color:var(--t);font-size:13px}
+header{background:linear-gradient(135deg,#ff6a00,#e8457c);color:#fff;padding:13px 24px;display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:50;box-shadow:0 2px 8px rgba(0,0,0,.1)}
+header h1{font-size:1.05rem;white-space:nowrap}
+.upload-grp{display:flex;align-items:center;gap:6px}
+.upload-grp label{font-size:.72rem;font-weight:600;background:rgba(255,255,255,.2);padding:4px 10px;border-radius:4px;cursor:pointer}
+.upload-grp label:hover{background:rgba(255,255,255,.35)}
+.upload-grp input[type=file]{width:0;height:0;overflow:hidden;position:absolute;opacity:0}
+.upload-grp .fname{font-size:.68rem;opacity:.9;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+header .r{margin-left:auto;font-size:.72rem;opacity:.85}
+.wrap{max-width:1400px;margin:0 auto;padding:16px 20px}
+.ph{text-align:center;padding:60px 20px;color:var(--s)}.ph .ic{font-size:3rem;margin-bottom:8px}
+/* stats */
+.stats{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+.stat{background:var(--c);border-radius:8px;padding:10px 14px;border:1px solid var(--bd);text-align:center;flex:1;min-width:100px}
+.stat .sv{font-size:1.3rem;font-weight:700;color:var(--a)}.stat .sl{font-size:.64rem;color:var(--s);margin-top:2px}
+/* filters */
+.filters{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center}
+.filters select,.filters input{font-size:.72rem;padding:4px 8px;border:1px solid var(--bd);border-radius:4px;background:var(--c)}
+.filters .lbl{font-size:.68rem;color:var(--s);font-weight:600}
+/* cards */
+.asin-list{display:flex;flex-direction:column;gap:10px}
+.asin-card{background:var(--c);border-radius:10px;padding:14px;border:1px solid var(--bd);display:grid;grid-template-columns:70px 1fr;gap:12px}
+.asin-card img{width:70px;height:70px;object-fit:contain;border-radius:6px;border:1px solid #eee}
+.asin-card .info{min-width:0}
+.asin-card .top{display:flex;align-items:center;gap:6px;margin-bottom:4px;flex-wrap:wrap}
+.asin-card .asin-id{font-family:monospace;font-size:.74rem;font-weight:700}
+.asin-card .mp{font-size:.6rem;padding:1px 5px;border-radius:3px;background:#fff3e0;color:var(--a);font-weight:600}
+.grade{display:inline-block;padding:1px 6px;border-radius:3px;font-size:.62rem;font-weight:700;color:#fff}
+.grade-A{background:#1a8c2d}.grade-B{background:#43a047}.grade-C{background:#f57f17}.grade-D{background:#e65100}.grade-F{background:#c62828}
+.asin-card .title{font-size:.68rem;color:#555;line-height:1.3;margin-bottom:6px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+/* score bars */
+.scores{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:4px;margin-bottom:8px}
+.sc{font-size:.62rem}
+.sc .sl{color:var(--s);margin-bottom:1px}.sc .bar{height:6px;border-radius:3px;background:#eee;overflow:hidden}
+.sc .bar-fill{height:100%;border-radius:3px;transition:width .3s}
+.sc .sv{font-size:.6rem;font-weight:600;margin-top:1px}
+/* defects */
+.defects{display:flex;flex-direction:column;gap:3px}
+.defect{font-size:.62rem;padding:4px 6px;border-radius:4px;background:#fff8f0;border:1px solid #ffe0b2;line-height:1.3}
+.defect b{color:var(--a)}
+.defect .impact{color:var(--r);font-weight:600}
+.no-defect{font-size:.62rem;color:var(--g);padding:4px 0}
+@media print{header{position:relative!important}}
+</style>
+</head>
+<body>
+<header>
+  <h1>📋 Listing 优化建议可视化工具</h1>
+  <div class="upload-grp">
+    <label for="fi">上传 CDQ 数据</label>
+    <input type="file" id="fi" accept=".csv,.xlsx,.xls,.tsv">
+    <span id="us" class="fname"></span>
+  </div>
+  <span class="r">上传 CDQ 导出的 Excel/CSV，自动生成 ASIN 级优化建议</span>
+</header>
+<div class="wrap">
+  <div id="ph" class="ph"><div class="ic">📂</div><p>请上传 CDQ (Content Detail Quality) 导出的 Excel 或 CSV 文件</p></div>
+  <div id="main" style="display:none"></div>
+</div>
+<script>
+let DATA=null;
+
+document.getElementById('fi').onchange=function(e){
+  const f=e.target.files[0];if(!f)return;
+  const st=document.getElementById('us');st.textContent='解析中...';
+  const rd=new FileReader(),isC=/\.(csv|tsv)$/i.test(f.name);
+  rd.onload=function(ev){try{
+    let rows;
+    if(isC){rows=pCSV(ev.target.result)}
+    else{const wb=XLSX.read(ev.target.result,{type:'array'});rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''});}
+    rows=rows.map(r=>{const o={};Object.keys(r).forEach(k=>{o[k.trim()]=typeof r[k]==='string'?r[k].trim():r[k]});return o}).filter(r=>r['ASIN']);
+    DATA=parseData(rows);
+    st.textContent='✅ '+rows.length+' 条 ASIN';
+    render();
+  }catch(err){st.textContent='❌ '+err.message;console.error(err)}};
+  if(isC)rd.readAsText(f,'utf-8');else rd.readAsArrayBuffer(f);
+};
+
+function pCSV(t){const ls=t.split(/\r?\n/).filter(l=>l.trim());if(ls.length<2)return[];const d=ls[0].includes('\t')?'\t':ls[0].includes(';')?';':',';const h=sp(ls[0],d);return ls.slice(1).map(l=>{const v=sp(l,d),o={};h.forEach((k,i)=>o[k.trim()]=(v[i]||'').trim());return o}).filter(o=>Object.values(o).some(v=>v!==''))}
+function sp(l,d){const r=[];let c='',q=false;for(let i=0;i<l.length;i++){const x=l[i];if(x==='"')q=!q;else if(x===d&&!q){r.push(c);c=''}else c+=x}r.push(c);return r}
+
+function P(v){
+  if(v==null||v==='')return NaN;
+  const s=String(v).trim();
+  if(s==='—'||s==='-'||s==='N/A'||s==='0'||s==='0%')return 0;
+  const hasPercent=s.includes('%');
+  const n=parseFloat(s.replace(/[%\s,]/g,''));
+  if(isNaN(n))return NaN;
+  // If has % sign, value is already in percentage form (e.g. "65.40%" → 65.4)
+  if(hasPercent)return n;
+  // No % sign: Excel stores percentages as decimals (0.654 = 65.4%, 1.0 = 100%)
+  // Heuristic: if value is between 0 and 1 (inclusive), treat as decimal → multiply by 100
+  if(n>=0&&n<=1)return n*100;
+  // Otherwise it's already a percentage number (e.g. 65.4)
+  return n;
+}
+// For impact fields: same logic but also handle 0 explicitly
+function PI(v){
+  const r=P(v);
+  return r;
+}
+
+function parseData(rows){
+  // fuzzy field matching: find actual column names
+  const colMap={};
+  const wanted=['Parent ASIN','ASIN','Marketplace','Product Details','Main Image','CDQ v3 Grade','CDQ v3 Score',
+    'Structured Attribute Quality Score','Title Quality Score','Bullet Point Quality Score','Image Quality Score','Aplus Score','Variations Score','Creation Date',
+    'Structured Attribute Defects and Actions','Structured Attribute Actions Impact',
+    'Title Defects and Actions','Title Actions Impact',
+    'Bullet Point Defects and Actions','Bullet Point Actions Impact',
+    'Image Defects and Actions','Image Actions Impact',
+    'A+ Defects and Actions','A+ Actions Impact',
+    'Policy Violations and Actions','Policy Violation Actions Impact'];
+  if(rows.length){
+    const keys=Object.keys(rows[0]);
+    console.log('[DEBUG] Excel columns ('+keys.length+'):', keys.map(k=>'"'+k+'"').join(', '));
+    wanted.forEach(w=>{
+      const wl=w.toLowerCase().replace(/[\s_]+/g,'');
+      const found=keys.find(k=>k.toLowerCase().replace(/[\s_]+/g,'')===wl);
+      colMap[w]=found||w;
+      if(!found)console.log('[DEBUG] Column NOT found:', w, '| tried matching:', wl);
+    });
+    // Debug: print first 3 data rows with all score values
+    rows.slice(0,3).forEach((r,i)=>{
+      if(!r[colMap['ASIN']])return;
+      console.log('[DEBUG] Row '+i+' ASIN='+r[colMap['ASIN']]+
+        ' | CDQ Score raw='+JSON.stringify(r[colMap['CDQ v3 Score']])+
+        ' | Title Quality raw='+JSON.stringify(r[colMap['Title Quality Score']])+
+        ' | Attr Quality raw='+JSON.stringify(r[colMap['Structured Attribute Quality Score']])+
+        ' | Title Impact raw='+JSON.stringify(r[colMap['Title Actions Impact']])+
+        ' | Attr Impact raw='+JSON.stringify(r[colMap['Structured Attribute Actions Impact']]));
+    });
+  }
+  const g=k=>colMap[k]||k;
+
+  return rows.map(r=>{
+    const asin=(r[g('ASIN')]||'').toString().trim();
+    const parent=(r[g('Parent ASIN')]||'').toString().trim();
+    const mp=(r[g('Marketplace')]||'').toString().trim();
+    const title=(r[g('Product Details')]||'').toString().trim();
+    const img=(r[g('Main Image')]||'').toString().trim();
+    const grade=(r[g('CDQ v3 Grade')]||'').toString().trim();
+    const score=P(r[g('CDQ v3 Score')]);
+    const attrScore=P(r[g('Structured Attribute Quality Score')]);
+    const titleScore=P(r[g('Title Quality Score')]);
+    const bpScore=P(r[g('Bullet Point Quality Score')]);
+    const imgScore=P(r[g('Image Quality Score')]);
+    const aplusScore=P(r[g('Aplus Score')]);
+    const varScore=P(r[g('Variations Score')]);
+    const defects=[];
+    const fields=[
+      {name:'属性填充',defKey:'Structured Attribute Defects and Actions',impKey:'Structured Attribute Actions Impact'},
+      {name:'标题',defKey:'Title Defects and Actions',impKey:'Title Actions Impact'},
+      {name:'五点描述',defKey:'Bullet Point Defects and Actions',impKey:'Bullet Point Actions Impact'},
+      {name:'图片',defKey:'Image Defects and Actions',impKey:'Image Actions Impact'},
+      {name:'A+ 内容',defKey:'A+ Defects and Actions',impKey:'A+ Actions Impact'},
+      {name:'政策违规',defKey:'Policy Violations and Actions',impKey:'Policy Violation Actions Impact'}
+    ];
+    fields.forEach(f=>{
+      const d=(r[g(f.defKey)]||'').toString().trim();
+      const impRaw=r[g(f.impKey)];
+      const imp=P(impRaw);
+      if(d)defects.push({area:f.name,text:d,impact:imp});
+    });
+    // Debug first ASIN
+    if(rows.indexOf(r)===1){
+      console.log('[DEBUG] First ASIN raw:', JSON.stringify(r).substring(0,500));
+      console.log('[DEBUG] Title Quality raw:', r[g('Title Quality Score')], '→ parsed:', titleScore);
+      console.log('[DEBUG] Title Impact raw:', r[g('Title Actions Impact')], '→ parsed:', P(r[g('Title Actions Impact')]));
+      console.log('[DEBUG] Attr Impact raw:', r[g('Structured Attribute Actions Impact')], '→ parsed:', P(r[g('Structured Attribute Actions Impact')]));
+    }
+    return{asin,parent,mp,title,img,grade,score,attrScore,titleScore,bpScore,imgScore,aplusScore,varScore,defects,creationDate:(r[g('Creation Date')]||'').toString().trim()};
+  }).filter(r=>r.asin);
+}
+
+function render(){
+  if(!DATA||!DATA.length)return;
+  document.getElementById('ph').style.display='none';
+  const el=document.getElementById('main');el.style.display='block';
+  const mps=[...new Set(DATA.map(r=>r.mp).filter(Boolean))].sort();
+  const gradeList=['A','B','C','D','F','U'];
+
+  let h='';
+  // stats (dynamic, will be updated by renderCards)
+  h+='<div id="dynStats" class="stats"></div>';
+
+  // filters
+  h+='<div class="filters">';
+  h+='<span class="lbl">站点:</span><select id="fMp"><option value="">全部</option>';
+  mps.forEach(m=>{h+='<option value="'+m+'">'+m+'</option>'});
+  h+='</select>';
+  h+='<span class="lbl">Grade:</span><select id="fGrade"><option value="">全部</option>';
+  gradeList.forEach(g=>{h+='<option value="'+g+'">'+g+'</option>'});
+  h+='</select>';
+  h+='<span class="lbl">仅显示有优化项:</span><input type="checkbox" id="fDefect">';
+  h+='<span class="lbl" style="margin-left:8px">搜索 ASIN:</span><input type="text" id="fSearch" placeholder="输入 ASIN..." style="width:140px">';
+  h+='<span class="lbl" style="margin-left:8px">排序:</span><select id="fSort">';
+  h+='<option value="score-desc">分数 高→低</option><option value="score-asc">分数 低→高</option><option value="grade-asc">Grade 差→好</option><option value="grade-desc">Grade 好→差</option><option value="defects-desc">优化项 多→少</option>';
+  h+='</select>';
+  h+='</div>';
+
+  // cards container
+  h+='<div id="asinList" class="asin-list"></div>';
+  el.innerHTML=h;
+
+  // bind filters
+  ['fMp','fGrade','fDefect','fSearch','fSort'].forEach(id=>{
+    const evType=(id==='fDefect')?'change':'input';
+    document.getElementById(id).addEventListener(evType,renderCards);
+  });
+  renderCards();
+}
+
+function renderCards(){
+  const mp=document.getElementById('fMp').value;
+  const grade=document.getElementById('fGrade').value;
+  const defOnly=document.getElementById('fDefect').checked;
+  const search=document.getElementById('fSearch').value.trim().toUpperCase();
+  const sortBy=document.getElementById('fSort').value;
+
+  let filtered=DATA.filter(r=>{
+    if(mp&&r.mp!==mp)return false;
+    if(grade&&r.grade!==grade)return false;
+    if(defOnly&&r.defects.length===0)return false;
+    if(search&&!r.asin.toUpperCase().includes(search)&&!r.parent.toUpperCase().includes(search))return false;
+    return true;
+  });
+
+  // dynamic stats
+  const grades={A:0,B:0,C:0,D:0,F:0,U:0};
+  let totalDefects=0;
+  filtered.forEach(r=>{if(r.grade&&grades[r.grade]!==undefined)grades[r.grade]++;totalDefects+=r.defects.length});
+  const gradeList=['A','B','C','D','F','U'];
+  let sh='<div class="stat"><div class="sv">'+filtered.length+'</div><div class="sl">ASIN 数量</div></div>';
+  gradeList.forEach(g=>{if(grades[g]>0)sh+='<div class="stat"><div class="sv" style="color:'+gradeColor(g)+'">'+grades[g]+'</div><div class="sl">Grade '+g+'</div></div>'});
+  sh+='<div class="stat"><div class="sv" style="color:var(--r)">'+totalDefects+'</div><div class="sl">优化项总数</div></div>';
+  document.getElementById('dynStats').innerHTML=sh;
+
+  // sort
+  const go={F:0,D:1,U:1,C:2,B:3,A:4};
+  if(sortBy==='score-desc')filtered.sort((a,b)=>((b.score||0)-(a.score||0)));
+  else if(sortBy==='score-asc')filtered.sort((a,b)=>((a.score||0)-(b.score||0)));
+  else if(sortBy==='grade-asc')filtered.sort((a,b)=>(go[a.grade]||0)-(go[b.grade]||0)||((a.score||0)-(b.score||0)));
+  else if(sortBy==='grade-desc')filtered.sort((a,b)=>(go[b.grade]||0)-(go[a.grade]||0)||((b.score||0)-(a.score||0)));
+  else if(sortBy==='defects-desc')filtered.sort((a,b)=>b.defects.length-a.defects.length);
+
+  const el=document.getElementById('asinList');
+  if(!filtered.length){el.innerHTML='<p style="color:#888;text-align:center;padding:20px">无匹配结果</p>';return}
+
+  el.innerHTML=filtered.map(r=>{
+    let c='<div class="asin-card">';
+    // image
+    c+='<img src="'+(r.img||'data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2270%22 height=%2270%22><rect fill=%22%23eee%22 width=%2270%22 height=%2270%22/><text x=%2235%22 y=%2240%22 text-anchor=%22middle%22 fill=%22%23aaa%22 font-size=%2212%22>No Img</text></svg>')+'" onerror="this.src=\'data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2270%22 height=%2270%22><rect fill=%22%23eee%22 width=%2270%22 height=%2270%22/></svg>\'">';
+    c+='<div class="info">';
+    // top line
+    c+='<div class="top">';
+    c+='<span class="asin-id">'+r.asin+'</span>';
+    if(r.parent)c+='<span style="font-size:.58rem;color:#888">Parent: '+r.parent+'</span>';
+    c+='<span class="mp">'+r.mp+'</span>';
+    if(r.grade)c+='<span class="grade grade-'+r.grade+'">'+r.grade+'</span>';
+    if(!isNaN(r.score))c+='<span style="font-size:.62rem;font-weight:600;color:#555">'+r.score.toFixed(1)+'%</span>';
+    if(r.creationDate)c+='<span style="font-size:.58rem;color:#999">创建: '+esc(r.creationDate)+'</span>';
+    c+='</div>';
+    // title
+    c+='<div class="title">'+esc(r.title)+'</div>';
+    // score bars
+    c+='<div class="scores">';
+    [{l:'属性填充',v:r.attrScore},{l:'标题质量',v:r.titleScore},{l:'五点描述',v:r.bpScore},{l:'图片质量',v:r.imgScore},{l:'A+ 内容',v:r.aplusScore},{l:'变体',v:r.varScore}].forEach(s=>{
+      if(isNaN(s.v))return;
+      const pct=Math.min(s.v,100);
+      const col=pct>=90?'#1a8c2d':pct>=70?'#f57f17':'#c62828';
+      c+='<div class="sc"><div class="sl">'+s.l+'</div><div class="bar"><div class="bar-fill" style="width:'+pct+'%;background:'+col+'"></div></div><div class="sv" style="color:'+col+'">'+s.v.toFixed(1)+'%</div></div>';
+    });
+    c+='</div>';
+    // defects
+    if(r.defects.length){
+      c+='<div class="defects">';
+      r.defects.forEach(d=>{
+        c+='<div class="defect"><b>'+d.area+'：</b>'+esc(d.text);
+        if(!isNaN(d.impact))c+='<br><span class="impact">→ 修复后预计该维度提升 +'+d.impact.toFixed(1)+'%</span>';
+        c+='</div>';
+      });
+      c+='</div>';
+    }else{
+      c+='<div class="no-defect">✅ 暂无优化建议</div>';
+    }
+    c+='</div></div>';
+    return c;
+  }).join('');
+}
+
+function gradeColor(g){return{A:'#1a8c2d',B:'#43a047',C:'#f57f17',D:'#e65100',F:'#c62828',U:'#777'}[g]||'#777'}
+function esc(s){return s?s.replace(/</g,'&lt;').replace(/>/g,'&gt;'):''}
+</script>
+</body>
+</html>
