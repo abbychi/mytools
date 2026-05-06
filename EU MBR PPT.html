@@ -1,0 +1,1078 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>EU MBR 可视化工具</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--a:#ff6a00;--bg:#f4f5f7;--c:#fff;--t:#1a1a1a;--s:#777;--bd:#e4e4e4;--g:#1a8c2d;--r:#c62828;--b:#1565c0}
+body{font-family:'Segoe UI','Microsoft YaHei',sans-serif;background:var(--bg);color:var(--t);font-size:13px}
+header{background:linear-gradient(135deg,#ff6a00,#e8457c);color:#fff;padding:13px 24px;display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:50;box-shadow:0 2px 8px rgba(0,0,0,.1)}
+header h1{font-size:1.05rem;white-space:nowrap}header .r{margin-left:auto;font-size:.75rem;opacity:.85}
+.wrap{max-width:1360px;margin:0 auto;padding:16px 20px}
+.ph{text-align:center;padding:70px 20px;color:var(--s)}.ph .ic{font-size:3.2rem;margin-bottom:10px}
+.g{display:grid;gap:12px;margin-bottom:14px}.g2{grid-template-columns:1fr 1fr}.g3{grid-template-columns:1fr 1fr 1fr}
+@media(max-width:960px){.g2,.g3{grid-template-columns:1fr}}
+.cd{background:var(--c);border-radius:10px;padding:14px;border:1px solid var(--bd);margin-bottom:12px}
+.cd-t{font-size:.84rem;font-weight:600;margin-bottom:8px}
+.kr{display:grid;grid-template-columns:repeat(auto-fit,minmax(125px,1fr));gap:10px;margin-bottom:14px}
+.kc{background:var(--c);border-radius:10px;padding:10px 8px;border:1px solid var(--bd);text-align:center}
+.kc .l{font-size:.64rem;color:var(--s);margin-bottom:1px}.kc .v{font-size:1.15rem;font-weight:700;color:var(--a)}
+.kc .ch{font-size:.66rem;margin-top:1px}.up{color:var(--g)}.dn{color:var(--r)}
+.st{font-size:1.1rem;font-weight:700;margin:22px 0 4px;padding-left:8px;border-left:4px solid var(--a)}
+.ss{font-size:.76rem;color:var(--s);margin-bottom:12px;padding-left:12px}
+.site-hd{font-size:.95rem;font-weight:700;margin:16px 0 6px;color:var(--b)}
+.summary{background:#fffbf5;border:1px solid #ffe0b2;border-radius:8px;padding:10px 12px;margin:10px 0 14px;font-size:.76rem;line-height:1.55;color:#5d4037}
+.summary b{color:var(--a)}
+.tw{max-height:420px;overflow:auto;border:1px solid var(--bd);border-radius:8px}
+table.dt{width:100%;border-collapse:collapse;font-size:.72rem}
+.dt th,.dt td{padding:5px 6px;text-align:right;border-bottom:1px solid #f0f0f0}
+.dt th{background:#fff8f2;color:var(--a);font-weight:600;position:sticky;top:0;z-index:1}
+.dt th:first-child,.dt td:first-child{text-align:left}.dt tr:hover td{background:#fff5ee}
+.tg{display:inline-block;padding:1px 5px;border-radius:3px;font-size:.64rem;font-weight:600}
+.tg-u{background:#e8f5e9;color:var(--g)}.tg-d{background:#fce4ec;color:var(--r)}
+.il{display:flex;flex-direction:column;gap:7px}
+.ic{background:var(--c);border-radius:8px;padding:10px;border:1px solid var(--bd);border-left:4px solid var(--r)}
+.ic.op{border-left-color:var(--g)}.ic.w{border-left-color:#f57f17}
+.ic h4{font-size:.76rem;margin-bottom:2px}.ic p{font-size:.69rem;color:var(--s);line-height:1.4}
+.nm{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:var(--a);color:#fff;font-size:.6rem;font-weight:700;margin-right:3px}
+.btn-pdf{background:#fff;color:var(--a);border:none;padding:6px 14px;border-radius:6px;font-size:.75rem;font-weight:600;cursor:pointer;transition:all .2s;white-space:nowrap}
+.btn-pdf:hover{background:#fff3e0;transform:scale(1.03)}.btn-pdf:disabled{opacity:.5;cursor:not-allowed}
+/* section color bands */
+.sec{border-radius:12px;padding:18px 16px 8px;margin-bottom:18px}
+.sec .st{margin-top:0}
+.sec-1{background:linear-gradient(135deg,#fff8f0 0%,#fff3e6 100%);border:1px solid #ffe0b2}
+.sec-1 .st{border-left-color:#ff6a00}
+.sec-2{background:linear-gradient(135deg,#f5f5f5 0%,#eeeeee 100%);border:1px solid #e0e0e0}
+.sec-2 .st{border-left-color:#555}
+.sub-blk{border-radius:8px;padding:12px 10px 6px;margin:8px 0;background:#fff;border:1px solid #e0e0e0}
+.sub-blk-t{font-size:.78rem;font-weight:700;margin-bottom:8px;color:var(--t)}
+/* sec-1 全站总览：所有子区块统一橙色 */
+.sec-1 .sub-blk{border-left:4px solid #ff6a00}
+/* 站点颜色 */
+.site-de{--sc:#ff6a00;--sc-bg:#fff8f0;--sc-bd:#ffe0b2;--sc-grad:linear-gradient(135deg,#fff8f0,#fff3e6)}
+.site-es{--sc:#e8457c;--sc-bg:#fff5f8;--sc-bd:#f8bbd0;--sc-grad:linear-gradient(135deg,#fff5f8,#fce4ec)}
+.site-fr{--sc:#1565c0;--sc-bg:#f0f7ff;--sc-bd:#bbdefb;--sc-grad:linear-gradient(135deg,#f0f7ff,#e8f0fe)}
+.site-it{--sc:#2e7d32;--sc-bg:#f1f8f1;--sc-bd:#c8e6c9;--sc-grad:linear-gradient(135deg,#f1f8f1,#e8f5e9)}
+.site-uk{--sc:#6a1b9a;--sc-bg:#faf5ff;--sc-bd:#e1bee7;--sc-grad:linear-gradient(135deg,#faf5ff,#f3e5f5)}
+.site-blk{background:var(--sc-bg,#fff);border-radius:10px;padding:14px 12px 6px;margin-bottom:14px;border:1px solid var(--sc-bd,#e0e0e0);box-shadow:0 1px 4px rgba(0,0,0,.04)}
+.site-blk .site-hd{color:var(--sc,#333)}
+.site-blk .sub-blk{border-left:4px solid var(--sc,#ff6a00)}
+.site-blk .summary{border-color:var(--sc-bd,#ffe0b2);background:var(--sc-bg,#fffbf5)}
+.site-blk .summary b{color:var(--sc,var(--a))}
+.site-blk .kc .v{color:var(--sc,var(--a))}
+.site-blk .cd-t{color:var(--sc,var(--a))}
+.site-blk .dt th{background:var(--sc-bg,#fff8f2);color:var(--sc,var(--a))}
+.sec-3{background:linear-gradient(135deg,#f5fff5 0%,#edf7ed 100%);border:1px solid #c8e6c9}
+.sec-3 .st{border-left-color:#1a8c2d}
+.sec-4{background:linear-gradient(135deg,#fef5ff 0%,#f8ecfc 100%);border:1px solid #e1bee7}
+.sec-4 .st{border-left-color:#8e24aa}
+.sec-asin{background:linear-gradient(135deg,#f0f7ff 0%,#e8f0fe 100%);border:1px solid #bbdefb}
+.sec-asin .st{border-left-color:#1565c0}
+.sec-asin .sub-blk{border-left:4px solid #1565c0}
+.sec-asin .dt th{background:#f0f7ff;color:#1565c0}
+/* upload labels */
+.upload-grp{display:flex;align-items:center;gap:6px}
+.upload-grp label{font-size:.72rem;font-weight:600;background:rgba(255,255,255,.2);padding:2px 8px;border-radius:4px;white-space:nowrap;cursor:pointer}
+.upload-grp label:hover{background:rgba(255,255,255,.35)}
+.upload-grp input[type=file]{width:0;height:0;overflow:hidden;position:absolute;opacity:0}
+.upload-grp .fname{font-size:.68rem;opacity:.9;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media print{
+  header{position:relative!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .tw{max-height:none!important;overflow:visible!important}
+  .btn-pdf{display:none!important}
+  .ph{display:none!important}
+  body{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .sec,.cd,.sub-blk,.site-blk,.summary,.kc,.ic{break-inside:avoid}
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>📊 EU MBR 可视化工具</h1>
+  <div class="upload-grp">
+    <label for="fi2">① 上传 CID 汇总数据</label>
+    <input type="file" id="fi2" accept=".csv,.xlsx,.xls,.tsv">
+    <span id="us2" class="fname"></span>
+  </div>
+  <div class="upload-grp">
+    <label for="fi">② 上传 ITK/BN 数据</label>
+    <input type="file" id="fi" accept=".csv,.xlsx,.xls,.tsv">
+    <span id="us" class="fname"></span>
+  </div>
+  <div class="upload-grp">
+    <label for="fi3">③ 上传 ASIN 数据</label>
+    <input type="file" id="fi3" accept=".csv,.xlsx,.xls,.tsv">
+    <span id="us3" class="fname"></span>
+  </div>
+  <button class="btn-pdf" id="btnPdf" onclick="exportPDF()" disabled>📄 导出 PDF</button>
+  <span class="r">① CID：卖家整体运营数据 &nbsp; ② ITK/BN：按品类拆分 &nbsp; ③ ASIN：单品级数据</span>
+</header>
+<div class="wrap">
+  <div id="ph" class="ph"><div class="ic">📂</div><p>请先点击 <b>① 上传 CID 汇总数据</b>（卖家整体运营指标，含广告/新品/库存等）<br>再点击 <b>② 上传 ITK/BN 数据</b>（按品类拆分的月度 Performance 数据）<br>可选 <b>③ 上传 ASIN 数据</b>（单品级 Performance 数据）</p></div>
+  <div id="main" style="display:none"></div>
+</div>
+<script>
+const SITES=['DE','ES','FR','IT','UK'],
+CL=['#ff6a00','#ff9a44','#e8457c','#ffb74d','#f06292'],
+FL={DE:'🇩🇪',ES:'🇪🇸',FR:'🇫🇷',IT:'🇮🇹',UK:'🇬🇧'};
+let D=null,D2=null,D3=null,charts={};
+
+/* PDF export — clone-based approach to avoid height truncation */
+function exportPDF(){
+  const btn=document.getElementById('btnPdf');
+  btn.disabled=true;btn.textContent='⏳ 生成中...';
+  const el=document.getElementById('main');
+
+  // 1. canvas → static img
+  const canvasMap=[];
+  el.querySelectorAll('canvas').forEach(cv=>{
+    try{
+      const img=document.createElement('img');
+      img.src=cv.toDataURL('image/png');
+      img.style.cssText='width:100%;max-height:280px';
+      cv.parentNode.insertBefore(img,cv);
+      cv.style.display='none';
+      canvasMap.push({cv,img});
+    }catch(e){}
+  });
+  Object.keys(charts).forEach(k=>{try{charts[k].destroy()}catch(e){}});
+
+  // 2. hide full cat tables, show only top5 rows; ASIN table top 10
+  const allTbodies=el.querySelectorAll('.cat-table tbody');
+  const hiddenRows=[];
+  allTbodies.forEach(tb=>{
+    const rows=tb.querySelectorAll('tr');
+    rows.forEach((tr,i)=>{if(i>=5){tr.style.display='none';hiddenRows.push(tr)}});
+  });
+  const asinTbodies=el.querySelectorAll('.asin-table tbody');
+  asinTbodies.forEach(tb=>{
+    const rows=tb.querySelectorAll('tr');
+    rows.forEach((tr,i)=>{if(i>=10){tr.style.display='none';hiddenRows.push(tr)}});
+  });
+
+  // 3. expand scroll containers
+  const saved=[];
+  el.querySelectorAll('.tw').forEach(t=>{saved.push({el:t,mh:t.style.maxHeight,ov:t.style.overflow});t.style.maxHeight='none';t.style.overflow='visible'});
+
+  // 4. collect sections and render page by page
+  const sections=[...el.querySelectorAll('.sec')];
+  const pdfMonth=D?D.y26+'-'+D.latest:'';
+  const pdfCid=D&&D.cid?'_'+D.cid:'';
+
+  // use jsPDF directly for multi-page
+  const {jsPDF}=window.jspdf||{};
+
+  // fallback: use html2pdf with low scale
+  const opt={
+    margin:[4,3,4,3],
+    filename:'EU_MBR_'+pdfMonth+pdfCid+'.pdf',
+    image:{type:'jpeg',quality:0.88},
+    html2canvas:{
+      scale:1,
+      useCORS:true,
+      logging:false,
+      allowTaint:true
+    },
+    jsPDF:{unit:'mm',format:'a3',orientation:'portrait'},
+    pagebreak:{mode:['avoid-all','css'],avoid:['.sub-blk','.summary','.site-hd','.site-blk']}
+  };
+
+  html2pdf().set(opt).from(el).save().then(cleanup).catch(err=>{
+    console.error('PDF export error:',err);
+    cleanup();
+    alert('PDF 导出失败：'+err.message);
+  });
+
+  function cleanup(){
+    btn.disabled=false;btn.textContent='📄 导出 PDF';
+    canvasMap.forEach(({cv,img})=>{cv.style.display='';img.remove()});
+    hiddenRows.forEach(tr=>{tr.style.display=''});
+    saved.forEach(s=>{s.el.style.maxHeight=s.mh;s.el.style.overflow=s.ov});
+    charts={};
+    render();
+  }
+}
+
+/* upload */
+document.getElementById('fi').onchange=function(e){
+  const f=e.target.files[0];if(!f)return;
+  const st=document.getElementById('us');st.textContent='解析中...';
+  const rd=new FileReader(),isC=/\.(csv|tsv)$/i.test(f.name);
+  rd.onload=function(ev){try{
+    let rows;
+    if(isC)rows=pCSV(ev.target.result);
+    else{const wb=XLSX.read(ev.target.result,{type:'array'});rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''});}
+    rows=rows.map(r=>{const o={};Object.keys(r).forEach(k=>{o[k.trim()]=typeof r[k]==='string'?r[k].trim():r[k]});return o}).filter(r=>r['MP']);
+    st.textContent='✅ '+rows.length+' 行';
+    D=analyze(rows);render();document.getElementById('btnPdf').disabled=false;
+    // show CID info
+    const cidVal=D.cid||'未识别';
+    st.textContent='✅ '+rows.length+' 行 | CID: '+cidVal+' | 数据期间: '+D.y26+'-'+D.mm26[0]+'~'+D.y26+'-'+D.latest;
+  }catch(err){st.textContent='❌ '+err.message;console.error(err)}};
+  if(isC)rd.readAsText(f,'utf-8');else rd.readAsArrayBuffer(f);
+};
+
+/* CID-level upload */
+document.getElementById('fi2').onchange=function(e){
+  const f=e.target.files[0];if(!f)return;
+  const st2=document.getElementById('us2');st2.textContent='解析中...';
+  const rd=new FileReader(),isC=/\.(csv|tsv)$/i.test(f.name);
+  rd.onload=function(ev){try{
+    let rows;
+    if(isC)rows=pCSV(ev.target.result);
+    else{const wb=XLSX.read(ev.target.result,{type:'array'});rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''});}
+    rows=rows.map(r=>{const o={};Object.keys(r).forEach(k=>{o[k.trim()]=typeof r[k]==='string'?r[k].trim():r[k]});return o}).filter(r=>r['MP']||r['Month']);
+    D2=analyzeCID(rows);
+    st2.textContent='✅ CID数据 '+rows.length+' 行';
+    if(D)render(); // re-render with CID data
+  }catch(err){st2.textContent='❌ '+err.message;console.error(err)}};
+  if(isC)rd.readAsText(f,'utf-8');else rd.readAsArrayBuffer(f);
+};
+
+/* ASIN-level upload */
+document.getElementById('fi3').onchange=function(e){
+  const f=e.target.files[0];if(!f)return;
+  const st3=document.getElementById('us3');st3.textContent='解析中...';
+  const rd=new FileReader(),isC=/\.(csv|tsv)$/i.test(f.name);
+  rd.onload=function(ev){try{
+    let rows;
+    if(isC)rows=pCSV(ev.target.result);
+    else{const wb=XLSX.read(ev.target.result,{type:'array'});rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''});}
+    rows=rows.map(r=>{const o={};Object.keys(r).forEach(k=>{o[k.trim()]=typeof r[k]==='string'?r[k].trim():r[k]});return o}).filter(r=>r['MP']||r['Month']);
+    D3=analyzeASIN(rows);
+    st3.textContent='✅ ASIN数据 '+rows.length+' 行';
+    if(D)render();
+  }catch(err){st3.textContent='❌ '+err.message;console.error(err)}};
+  if(isC)rd.readAsText(f,'utf-8');else rd.readAsArrayBuffer(f);
+};
+
+function analyzeASIN(raw){
+  const rows=raw.map(r=>{
+    const site=dS(r['MP']),month=dM(r['Month']);
+    if(!site||!month)return null;
+    // 兼容多种字段名写法
+    const top80Key=Object.keys(r).find(k=>k.replace(/[\s?？]/g,'').toUpperCase().includes('TOP80'));
+    const top80Raw=top80Key?r[top80Key]:'';
+    const top80Val=top80Raw.toString().trim().toUpperCase();
+    const isTop80=(top80Val==='Y'||top80Val==='YES'||top80Val==='TRUE'||top80Val==='1');
+    return{site,month,yr:month.slice(0,4),mm:month.slice(5,7),
+      asin:(r['ASIN']||'').trim(),parent:(r['Parent ASIN']||'').trim(),
+      brand:(r['Brand Name']||'').trim(),
+      cat:(r['ITK/BN ENG']||r['ITK/BN']||'').trim(),
+      priceBand:(r['ASIN Price Band']||'').trim(),
+      asinAge:(r['ASIN Age']||'').trim(),
+      isTop80,
+      gms:V(r['GMS']),gv:V(r['GV']),units:V(r['Units']),
+      cr:P(r['CR']),asp:P(r['ASP']),
+      gmsYoY:P(r['GMS YoY']),unitsYoY:P(r['Units YoY']),crYoY:P(r['CR YoY']),aspYoY:P(r['ASP YoY']),
+      gmsMoM:P(r['GMS MoM']),
+      bmCR:P(r['Benchmark CR']),bmASP:P(r['Benchmark ASP']),
+      bmGmsYoY:P(r['Benchmark GMS YoY']),
+      gmsPenYoY:P(r['GMS Penetration YoY Change']),
+      gvPenYoY:P(r['GV Penetration YoY Change'])};
+  }).filter(Boolean);
+  const years=[...new Set(rows.map(r=>r.yr))].sort();
+  const y26=years.find(y=>y==='2026')||years[years.length-1];
+  const y25=years.find(y=>y==='2025')||years[0];
+  const r26=rows.filter(r=>r.yr===y26),r25=rows.filter(r=>r.yr===y25);
+  const mm26=[...new Set(r26.map(r=>r.mm))].sort();
+  const latest=mm26[mm26.length-1];
+  const sites=SITES.filter(s=>r26.some(r=>r.site===s));
+  // 自动按 GMS 降序算 Top80%（无论原始标记是否存在，都做兜底）
+  const latestRows=r26.filter(r=>r.mm===latest);
+  const hasTop80=latestRows.some(r=>r.isTop80);
+  if(!hasTop80&&latestRows.length){
+    // 按 ASIN+站点 聚合 GMS，再按聚合 GMS 降序标记
+    const asinMap={};
+    latestRows.forEach(r=>{
+      const key=r.asin+'_'+r.site;
+      if(!asinMap[key])asinMap[key]={gms:0,rows:[]};
+      asinMap[key].gms+=r.gms;asinMap[key].rows.push(r);
+    });
+    const sorted=Object.values(asinMap).sort((a,b)=>b.gms-a.gms);
+    const totalGms=sorted.reduce((s,a)=>s+a.gms,0);
+    if(totalGms>0){
+      let cumGms=0;
+      sorted.forEach(a=>{
+        cumGms+=a.gms;
+        if(cumGms<=totalGms*0.8||a===sorted[0])a.rows.forEach(r=>{r.isTop80=true});
+      });
+      // 也标记 r26 中对应的历史月份行
+      const top80Keys=new Set(sorted.filter(a=>a.rows[0].isTop80).map(a=>a.rows[0].asin+'_'+a.rows[0].site));
+      r26.forEach(r=>{if(top80Keys.has(r.asin+'_'+r.site))r.isTop80=true;});
+    }
+  }
+  console.log('[ASIN] 解析完成: '+r26.length+' 行('+y26+'), latest='+latest+', Top80%='+r26.filter(r=>r.mm===latest&&r.isTop80).length+' 条');
+  return{rows,r26,r25,y26,y25,latest,mm26,sites};
+}
+
+function analyzeCID(raw){
+  const rows=raw.map(r=>{
+    const site=dS(r['MP']);const month=dM(r['Month']);
+    if(!site||!month)return null;
+    return{site,month,yr:month.slice(0,4),mm:month.slice(5,7),
+      cid:(r['CID']||r['Customer ID']||'').toString().trim(),
+      gms:V(r['GMS']),gv:V(r['GV']),units:V(r['Units']),ba:V(r['BA']),cr:P(r['CR']),asp:P(r['ASP']),
+      gmsYoY:P(r['GMS YoY']),gmsMoM:P(r['GMS MoM']),crYoY:P(r['CR YoY']),aspYoY:P(r['ASP YoY']),
+      newGms:V(r['New GMS']),newGmsPct:P(r['New GMS%']),newUnits:V(r['New Units']),
+      fbaGms:V(r['FBA GMS']),fbaGmsPct:P(r['FBA GMS%']),
+      promoOps:V(r['Promotion OPS']),promoOpsPct:P(r['Promotion OPS%GMS']),
+      dealOps:V(r['Deal OPS']),dealOpsPct:P(r['Deal OPS%GMS']),
+      couponOps:V(r['Coupon OPS']),couponOpsPct:P(r['Coupon OPS%GMS']),
+      adsSpend:V(r['Ads Spend']),adsSales:V(r['Ads Sales']),adsACOS:P(r['Ads ACOS']),adsROAS:P(r['Ads ROAS']),adsTACOS:P(r['Ads TACOS']),
+      adsCTR:P(r['Ads CTR']),adsCPC:P(r['Ads CPC']),adsCVR:P(r['Ads CVR']),
+      spSpend:V(r['SP Spend']),spSales:V(r['SP Sales']),spACOS:P(r['SP ACOS']),spROAS:P(r['SP ROAS']),spTACOS:P(r['SP TACOS']),
+      sbSpend:V(r['SB Spend']),sbSales:V(r['SB Sales']),sbACOS:P(r['SB ACOS']),sbROAS:P(r['SB ROAS']),
+      sdSpend:V(r['SD Spend']),sdSales:V(r['SD Sales']),sdACOS:P(r['SD ACOS']),sdROAS:P(r['SD ROAS']),
+      b2bGms:V(r['B2B GMS']),b2bPct:P(r['B2B GMS%']),
+      ipi:V(r['IPI Score']),woc:P(r['AVG. WOC']),excessPct:P(r['Excess PCT']),
+      awagv:P(r['AWAGV']),awas:P(r['AWAS']),ftac:P(r['FTAC']),
+      asinDisc:P(r['ASIN Discoverability']),asinConv:P(r['ASIN Conversion'])};
+  }).filter(Boolean);
+  const years=[...new Set(rows.map(r=>r.yr))].sort();
+  const y26=years.find(y=>y==='2026')||years[years.length-1];
+  const y25=years.find(y=>y==='2025')||years[0];
+  const r26=rows.filter(r=>r.yr===y26),r25=rows.filter(r=>r.yr===y25);
+  const mm26=[...new Set(r26.map(r=>r.mm))].sort();
+  const latest=mm26[mm26.length-1];
+  const overlap=mm26.filter(m=>r25.some(r=>r.mm===m)).sort();
+  const sites=SITES.filter(s=>r26.some(r=>r.site===s));
+  const cidVal=rows.find(r=>r.cid)?.cid||'';
+  return{rows,r26,r25,y26,y25,latest,mm26,overlap,sites,cid:cidVal};
+}
+function pCSV(t){const ls=t.split(/\r?\n/).filter(l=>l.trim());if(ls.length<2)return[];const d=ls[0].includes('\t')?'\t':ls[0].includes(';')?';':',';const h=sp(ls[0],d);return ls.slice(1).map(l=>{const v=sp(l,d),o={};h.forEach((k,i)=>o[k.trim()]=(v[i]||'').trim());return o}).filter(o=>Object.values(o).some(v=>v!==''))}
+function sp(l,d){const r=[];let c='',q=false;for(let i=0;i<l.length;i++){const x=l[i];if(x==='"')q=!q;else if(x===d&&!q){r.push(c);c=''}else c+=x}r.push(c);return r}
+
+/* helpers */
+function P(v){if(v==null||v===''||v==='—'||v==='-'||v==='N/A')return NaN;return parseFloat(String(v).replace(/[$,€£%\s]/g,''))||NaN}
+function V(v){const n=P(v);return isNaN(n)?0:n}
+/* detect if % fields are 0-1 (decimal) or already 0-100 */
+let pctScale=1;
+function detectPctScale(rows){
+  const vals=[];
+  ['CR','SP ACOS','SP CTR','SP CVR'].forEach(f=>{rows.forEach(r=>{const v=P(r[f]);if(!isNaN(v)&&v>0)vals.push(v)})});
+  if(!vals.length)return;
+  const med=vals.sort((a,b)=>a-b)[Math.floor(vals.length/2)];
+  pctScale=med<1?100:1; // if median < 1, values are decimals like 0.05 = 5%
+}
+function pct(v){if(isNaN(v))return NaN;return v*pctScale} // convert to display %
+function fK(v){if(isNaN(v)||v===0)return '—';return v>=1e6?'$'+(v/1e6).toFixed(2)+'M':v>=1e3?'$'+(v/1e3).toFixed(1)+'K':'$'+Math.round(v).toLocaleString()}
+function fN(v){if(isNaN(v)||v===0)return '—';return v>=1e6?(v/1e6).toFixed(2)+'M':v>=1e3?(v/1e3).toFixed(1)+'K':Math.round(v).toLocaleString()}
+function fP(v){if(isNaN(v))return '—';return pct(v).toFixed(2)+'%'}
+function fPr(v){if(isNaN(v))return '—';return (v*pctScale).toFixed(1)+'%'} // for YoY% fields
+function fD(v){if(isNaN(v))return '—';return '$'+v.toFixed(2)}
+function fR(v){if(isNaN(v))return '—';return v.toFixed(2)+'x'}
+function tH(v){if(isNaN(v))return '—';const d=pct(v);return '<span class="tg '+(d>=0?'tg-u':'tg-d')+'">'+(d>=0?'+':'')+d.toFixed(1)+'%</span>'}
+function tHraw(v){if(isNaN(v))return '—';return '<span class="tg '+(v>=0?'tg-u':'tg-d')+'">'+(v>=0?'+':'')+v.toFixed(1)+'%</span>'}
+function dc(id){if(charts[id]){charts[id].destroy();delete charts[id]}}
+function mc(id,cfg){dc(id);if(!cfg.options)cfg.options={};cfg.options.devicePixelRatio=1;cfg.options.responsive=true;charts[id]=new Chart(document.getElementById(id),cfg);return charts[id]}
+function dS(v){if(!v)return null;const u=v.toString().trim().toUpperCase();if(SITES.includes(u))return u;if(u==='GB')return 'UK';for(const s of SITES)if(u.includes(s))return s;if(u.includes('.CO.UK'))return 'UK';return null}
+function dM(v){if(!v)return null;const s=v.toString().trim();let m=s.match(/(\d{4})[-\/](\d{1,2})/);if(m)return m[1]+'-'+m[2].padStart(2,'0');m=s.match(/^(\d{4})(\d{2})$/);if(m)return m[1]+'-'+m[2];return null}
+function wA(rows,f){let sw=0,sv=0;rows.forEach(r=>{const v=r[f],w=r.gms;if(!isNaN(v)&&w>0){sv+=v*w;sw+=w}});return sw>0?sv/sw:NaN}
+function sum(arr,f){return arr.reduce((s,r)=>s+(r[f]||0),0)}
+
+/* ===== ANALYZE ===== */
+function analyze(raw){
+  detectPctScale(raw);
+  const rows=raw.map(r=>{
+    const site=dS(r['MP']),month=dM(r['Month']);
+    if(!site||!month)return null;
+    return{site,month,yr:month.slice(0,4),mm:month.slice(5,7),
+      cat:(r['ITK/BN ENG']||r['ITK/BN']||'Unknown').trim(),
+      tier:(r['Tier']||'').toString().trim(),
+      isTop80:r['Is GMS Top80%']&&r['Is GMS Top80%'].toString().toUpperCase()==='Y',
+      gms:V(r['GMS']),gv:V(r['GV']),units:V(r['Units']),
+      cr:P(r['CR']),asp:P(r['ASP']),
+      gmsYoY:P(r['GMS YoY']),unitsYoY:P(r['Units YoY']),crYoY:P(r['CR YoY']),aspYoY:P(r['ASP YoY']),
+      gmsMoM:P(r['GMS MoM']),
+      bmCR:P(r['Benchmark CR']),bmASP:P(r['Benchmark ASP']),bmGmsYoY:P(r['Benchmark GMS YoY']),
+      gmsPenYoY:P(r['GMS Penetration YoY Change']),
+      spSpend:V(r['SP Spend']),spSales:V(r['SP Sales']),
+      spACOS:P(r['SP ACOS']),spTACOS:P(r['SP TACOS']),spROAS:P(r['SP ROAS']),
+      bmSpACOS:P(r['Benchmark SP ACOS']),
+      spCTR:P(r['SP CTR']),spCPC:P(r['SP CPC']),spCVR:P(r['SP CVR'])}
+  }).filter(Boolean);
+  const years=[...new Set(rows.map(r=>r.yr))].sort();
+  const y26=years.find(y=>y==='2026')||years[years.length-1];
+  const y25=years.find(y=>y==='2025')||years[0];
+  const r26=rows.filter(r=>r.yr===y26),r25=rows.filter(r=>r.yr===y25);
+  const mm26=[...new Set(r26.map(r=>r.mm))].sort();
+  const mm25=[...new Set(r25.map(r=>r.mm))].sort();
+  const overlap=mm26.filter(m=>mm25.includes(m)).sort();
+  const latest=mm26[mm26.length-1];
+  const sites=SITES.filter(s=>r26.some(r=>r.site===s)).sort((a,b)=>{
+    const ga=r26.filter(r=>r.site===a).reduce((s,r)=>s+r.gms,0);
+    const gb=r26.filter(r=>r.site===b).reduce((s,r)=>s+r.gms,0);
+    return gb-ga;
+  });
+  return{rows,r26,r25,y26,y25,mm26,mm25,overlap,latest,sites,cid:raw[0]&&(raw[0]['CID']||raw[0]['Customer ID']||raw[0]['cid']||'')};
+}
+
+/* ===== RENDER ===== */
+function render(){
+  if(!D)return;
+  document.getElementById('ph').style.display='none';
+  const el=document.getElementById('main');el.style.display='block';
+  const{r26,r25,y26,y25,overlap,latest,sites}=D;
+  let h='';
+  let cid=0;const nid=()=>'ch'+(cid++);
+  const postDraw=[];
+
+  /* ============ SECTION 1: 全站总览 ============ */
+  h+='<div class="sec sec-1">';
+  const cidLabel=D.cid?'CID: '+D.cid+' | ':'';
+  h+='<div class="st">📋 全站总览 — '+cidLabel+y26+'-'+latest+' 最新月 & YTD</div>';
+  h+='<div class="ss">'+cidLabel+'全站点合计，最新月份 vs 同期 + YTD 累计</div>';
+  const rL6=r26.filter(r=>r.mm===latest),rL5=r25.filter(r=>r.mm===latest);
+  const rOl6=r26.filter(r=>overlap.includes(r.mm)),rOl5=r25.filter(r=>overlap.includes(r.mm));
+  const lg6=sum(rL6,'gms'),lg5=sum(rL5,'gms'),lu6=sum(rL6,'units'),lu5=sum(rL5,'units');
+  const tg6=sum(rOl6,'gms'),tg5=sum(rOl5,'gms');
+  // 全站 CR = Units/GV, ASP = GMS/Units, YoY 自己算
+  const lgv6=sum(rL6,'gv'),lgv5=sum(rL5,'gv');
+  const lcr6Pct=lgv6>0?(lu6/lgv6):NaN;
+  const lcr5Pct=lgv5>0?(lu5/lgv5):NaN;
+  const lasp6Val=lu6>0?(lg6/lu6):NaN;
+  const lasp5Val=lu5>0?(lg5/lu5):NaN;
+  const lcrYoYPct=(!isNaN(lcr6Pct)&&!isNaN(lcr5Pct)&&lcr5Pct>0)?((lcr6Pct-lcr5Pct)/lcr5Pct*100):NaN;
+  const laspYoYPct=(!isNaN(lasp6Val)&&!isNaN(lasp5Val)&&lasp5Val>0)?((lasp6Val-lasp5Val)/lasp5Val*100):NaN;
+  h+='<div class="sub-blk">';
+  h+='<div class="sub-blk-t">📊 业绩表现</div>';
+  h+='<div class="kr">';
+  [{l:latest+'月 GMS',v:fK(lg6),c:lg5?(lg6-lg5)/lg5*100:NaN},
+   {l:latest+'月 Units',v:fN(lu6),c:lu5?(lu6-lu5)/lu5*100:NaN},
+   {l:latest+'月 CR',v:isNaN(lcr6Pct)?'—':(lcr6Pct*100).toFixed(2)+'%',c:lcrYoYPct},
+   {l:latest+'月 ASP',v:isNaN(lasp6Val)?'—':'$'+lasp6Val.toFixed(2),c:laspYoYPct},
+   {l:'YTD GMS ('+y26+')',v:fK(tg6),c:tg5?(tg6-tg5)/tg5*100:NaN},
+   {l:'YTD GMS ('+y25+'同期)',v:fK(tg5)}
+  ].forEach(k=>{
+    let ch='';
+    if(k.c!==undefined&&k.c!==null&&!isNaN(k.c)){
+      ch='<div class="ch '+(k.c>=0?'up':'dn')+'">'+(k.c>=0?'▲':'▼')+Math.abs(k.c).toFixed(1)+'%</div>';
+    }
+    h+='<div class="kc"><div class="l">'+k.l+'</div><div class="v">'+k.v+'</div>'+ch+'</div>';
+  });
+  h+='</div>';
+  // 全站业绩总结
+  const gYoY=lg5?(lg6-lg5)/lg5*100:0;const ytdYoY=tg5?(tg6-tg5)/tg5*100:0;
+  let sumTxt='<b>总结：</b>'+y26+'-'+latest+'月全站 GMS '+fK(lg6)+'，同比'+(gYoY>=0?'增长':'下降')+' '+Math.abs(gYoY).toFixed(1)+'%。';
+  sumTxt+='YTD 累计 '+fK(tg6)+'，同比'+(ytdYoY>=0?'增长':'下降')+' '+Math.abs(ytdYoY).toFixed(1)+'%。';
+  if(gYoY<0)sumTxt+='<b>⚠️ 最新月份同比下滑，需重点关注。</b>';
+  else if(gYoY>20)sumTxt+='<b>✅ 最新月份增长强劲。</b>';
+  h+='<div class="summary">'+sumTxt+'</div>';
+  h+='</div>'; /* close sub-blk-itk */
+  /* --- CID 级补充指标（全站） --- */
+  if(D2){
+    const c2L=D2.r26.filter(r=>r.mm===D2.latest),c2L5=D2.r25.filter(r=>r.mm===D2.latest);
+    const c2O=D2.r26.filter(r=>D2.overlap.includes(r.mm));
+    // current month
+    const tAdsSpend=sum(c2L,'adsSpend'),tAdsSales=sum(c2L,'adsSales');
+    const tSpSpend=sum(c2L,'spSpend'),tSbSpend=sum(c2L,'sbSpend'),tSdSpend=sum(c2L,'sdSpend');
+    const tNewGms=sum(c2L,'newGms'),tFbaGms=sum(c2L,'fbaGms'),tGms2=sum(c2L,'gms');
+    const tPromo=sum(c2L,'promoOps'),tDeal=sum(c2L,'dealOps'),tCoupon=sum(c2L,'couponOps');
+    const aACOS=wA(c2L,'adsACOS'),aROAS=wA(c2L,'adsROAS'),aTACOS=wA(c2L,'adsTACOS');
+    const avgIpi=c2L.reduce((s,r)=>s+(r.ipi||0),0)/Math.max(c2L.filter(r=>r.ipi>0).length,1);
+    const avgWoc=c2L.reduce((s,r)=>s+(r.woc||0),0)/Math.max(c2L.filter(r=>r.woc>0).length,1);
+    const avgExc=wA(c2L,'excessPct');
+    // YoY (same month last year)
+    const tAdsSpend5=sum(c2L5,'adsSpend'),tAdsSales5=sum(c2L5,'adsSales');
+    const tNewGms5=sum(c2L5,'newGms'),tFbaGms5=sum(c2L5,'fbaGms'),tGms25=sum(c2L5,'gms');
+    const tPromo5=sum(c2L5,'promoOps'),tDeal5=sum(c2L5,'dealOps'),tCoupon5=sum(c2L5,'couponOps');
+    const aACOS5=wA(c2L5,'adsACOS'),aROAS5=wA(c2L5,'adsROAS'),aTACOS5=wA(c2L5,'adsTACOS');
+    const tSpSpend5=sum(c2L5,'spSpend'),tSbSpend5=sum(c2L5,'sbSpend'),tSdSpend5=sum(c2L5,'sdSpend');
+    const avgIpi5=c2L5.length?c2L5.reduce((s,r)=>s+(r.ipi||0),0)/Math.max(c2L5.filter(r=>r.ipi>0).length,1):NaN;
+    const avgWoc5=c2L5.length?c2L5.reduce((s,r)=>s+(r.woc||0),0)/Math.max(c2L5.filter(r=>r.woc>0).length,1):NaN;
+    const avgExc5=wA(c2L5,'excessPct');
+    const newPct26=tGms2?(tNewGms/tGms2*100):NaN,newPct25=tGms25?(tNewGms5/tGms25*100):NaN;
+    const fbaPct26=tGms2?(tFbaGms/tGms2*100):NaN,fbaPct25=tGms25?(tFbaGms5/tGms25*100):NaN;
+    function yoy(a,b){return b?(a-b)/b*100:NaN}
+    function ppChg(a,b){return(!isNaN(a)&&!isNaN(b))?(pct(a)-pct(b)):NaN}
+    h+='<div class="sub-blk"><div class="sub-blk-t">📦 补充运营指标（'+latest+'月 vs 同期 · CID 汇总数据）</div><div class="kr">';
+    [{l:'Ads Spend',v:fK(tAdsSpend),c:yoy(tAdsSpend,tAdsSpend5)},
+     {l:'Ads Sales',v:fK(tAdsSales),c:yoy(tAdsSales,tAdsSales5)},
+     {l:'Ads ACOS',v:fP(aACOS),c:ppChg(aACOS,aACOS5),pp:true},
+     {l:'Ads ROAS',v:fR(aROAS),c:aROAS5>0?(aROAS-aROAS5)/aROAS5*100:NaN},
+     {l:'Ads TACOS',v:fP(aTACOS),c:ppChg(aTACOS,aTACOS5),pp:true},
+     {l:'SP Spend',v:fK(tSpSpend),c:yoy(tSpSpend,tSpSpend5)},
+     {l:'SB Spend',v:fK(tSbSpend),c:yoy(tSbSpend,tSbSpend5)},
+     {l:'SD Spend',v:fK(tSdSpend),c:yoy(tSdSpend,tSdSpend5)},
+     {l:'New GMS',v:fK(tNewGms),c:yoy(tNewGms,tNewGms5)},
+     {l:'New GMS%',v:!isNaN(newPct26)?newPct26.toFixed(1)+'%':'—',c:(!isNaN(newPct26)&&!isNaN(newPct25))?(newPct26-newPct25):NaN,pp:true},
+     {l:'FBA GMS',v:fK(tFbaGms),c:yoy(tFbaGms,tFbaGms5)},
+     {l:'FBA%',v:!isNaN(fbaPct26)?fbaPct26.toFixed(1)+'%':'—',c:(!isNaN(fbaPct26)&&!isNaN(fbaPct25))?(fbaPct26-fbaPct25):NaN,pp:true},
+     {l:'Promo OPS',v:fK(tPromo),c:yoy(tPromo,tPromo5)},
+     {l:'Deal OPS',v:fK(tDeal),c:yoy(tDeal,tDeal5)},
+     {l:'Coupon OPS',v:fK(tCoupon),c:yoy(tCoupon,tCoupon5)},
+     {l:'IPI Score',v:avgIpi>0?Math.round(avgIpi).toString():'—',c:(avgIpi>0&&avgIpi5>0)?(avgIpi-avgIpi5):NaN,raw:true},
+     {l:'AVG WOC',v:avgWoc>0?avgWoc.toFixed(1):'—',c:(avgWoc>0&&avgWoc5>0)?(avgWoc-avgWoc5):NaN,raw:true},
+     {l:'Excess%',v:fP(avgExc),c:ppChg(avgExc,avgExc5),pp:true}
+    ].forEach(k=>{
+      let ch='';
+      if(k.c!==undefined&&k.c!==null&&!isNaN(k.c)){
+        if(k.raw)ch='<div class="ch '+(k.c>=0?'up':'dn')+'">'+(k.c>=0?'▲':'▼')+Math.abs(k.c).toFixed(1)+'</div>';
+        else if(k.pp)ch='<div class="ch '+(k.c>=0?'up':'dn')+'">'+(k.c>=0?'▲':'▼')+Math.abs(k.c).toFixed(2)+'%</div>';
+        else ch='<div class="ch '+(k.c>=0?'up':'dn')+'">'+(k.c>=0?'▲':'▼')+Math.abs(k.c).toFixed(1)+'%</div>';
+      }
+      h+='<div class="kc"><div class="l">'+k.l+'</div><div class="v">'+k.v+'</div>'+ch+'</div>';
+    });
+    h+='</div>';
+    // diagnostic summary
+    let cidSum='<b>运营诊断：</b>';const cidIss=[];
+    const acosChg=ppChg(aACOS,aACOS5);
+    if(!isNaN(acosChg)&&acosChg>2)cidIss.push('⚠️ Ads ACOS 同比上升 '+acosChg.toFixed(2)+'%（'+fP(aACOS5)+'→'+fP(aACOS)+'）');
+    const tacosChg=ppChg(aTACOS,aTACOS5);
+    if(!isNaN(tacosChg)&&tacosChg>1)cidIss.push('⚠️ TACOS 同比上升 '+tacosChg.toFixed(2)+'%');
+    const roasChg=aROAS5>0?(aROAS-aROAS5)/aROAS5*100:NaN;
+    if(!isNaN(roasChg)&&roasChg<-15)cidIss.push('⚠️ Ads ROAS 同比下降 '+Math.abs(roasChg).toFixed(1)+'%（'+fR(aROAS5)+'→'+fR(aROAS)+'）');
+    const adsSpendY=yoy(tAdsSpend,tAdsSpend5),adsSalesY=yoy(tAdsSales,tAdsSales5);
+    if(!isNaN(adsSpendY)&&!isNaN(adsSalesY)&&adsSpendY>adsSalesY+10)cidIss.push('⚠️ 广告花费增速（+'+adsSpendY.toFixed(1)+'%）远超广告销售增速（+'+adsSalesY.toFixed(1)+'%）');
+    const spY=yoy(tSpSpend,tSpSpend5),sbY=yoy(tSbSpend,tSbSpend5),sdY=yoy(tSdSpend,tSdSpend5);
+    if(!isNaN(spY)&&spY>30&&(!isNaN(acosChg)&&acosChg>1))cidIss.push('⚠️ SP 花费同比 +'+spY.toFixed(1)+'% 且 ACOS 上升');
+    if(!isNaN(sbY)&&sbY>50)cidIss.push('📊 SB 花费同比 +'+sbY.toFixed(1)+'%');
+    if(!isNaN(sdY)&&sdY>50)cidIss.push('📊 SD 花费同比 +'+sdY.toFixed(1)+'%');
+    const newPct=tGms2?(tNewGms/tGms2*100):0,newPct5=tGms25?(tNewGms5/tGms25*100):0;
+    if(newPct<newPct5-3)cidIss.push('⚠️ 新品 GMS 占比下降（'+newPct5.toFixed(1)+'%→'+newPct.toFixed(1)+'%）');
+    const fbaPctNow=tGms2?(tFbaGms/tGms2*100):0,fbaPctPrev=tGms25?(tFbaGms5/tGms25*100):0;
+    if(fbaPctNow<fbaPctPrev-3)cidIss.push('⚠️ FBA 占比下降（'+fbaPctPrev.toFixed(1)+'%→'+fbaPctNow.toFixed(1)+'%）');
+    if(avgIpi>0&&avgIpi<400)cidIss.push('⚠️ IPI '+Math.round(avgIpi)+'（<400）');
+    if(avgIpi>0&&avgIpi5>0&&avgIpi<avgIpi5-30)cidIss.push('⚠️ IPI 同比下降 '+Math.round(avgIpi5)+'→'+Math.round(avgIpi)+'（-'+Math.round(avgIpi5-avgIpi)+'）');
+    if(!isNaN(avgWoc)&&avgWoc>12)cidIss.push('⚠️ 平均库存周转 '+avgWoc.toFixed(1)+' 周');
+    if(!isNaN(avgWoc)&&!isNaN(avgWoc5)&&avgWoc5>0&&avgWoc>avgWoc5+3)cidIss.push('⚠️ WOC 同比增加 '+avgWoc5.toFixed(1)+'→'+avgWoc.toFixed(1)+' 周（+'+((avgWoc-avgWoc5)).toFixed(1)+'）');
+    if(!isNaN(pct(avgExc))&&pct(avgExc)>15)cidIss.push('⚠️ 冗余库存占比 '+pct(avgExc).toFixed(1)+'%');
+    const excChg=ppChg(avgExc,avgExc5);
+    if(!isNaN(excChg)&&excChg>3)cidIss.push('⚠️ 冗余库存占比同比上升 '+excChg.toFixed(2)+'%');
+    if(!isNaN(acosChg)&&acosChg<-1)cidIss.push('✅ ACOS 同比优化 '+Math.abs(acosChg).toFixed(2)+'%');
+    if(!isNaN(roasChg)&&roasChg>15)cidIss.push('✅ ROAS 同比提升 +'+roasChg.toFixed(1)+'%（'+fR(aROAS5)+'→'+fR(aROAS)+'）');
+    if(!isNaN(adsSalesY)&&adsSalesY>20)cidIss.push('✅ 广告销售同比 +'+adsSalesY.toFixed(1)+'%');
+    if(newPct>newPct5+3)cidIss.push('✅ 新品占比提升（'+newPct5.toFixed(1)+'%→'+newPct.toFixed(1)+'%）');
+    if(fbaPctNow>fbaPctPrev+3)cidIss.push('✅ FBA 占比提升（'+fbaPctPrev.toFixed(1)+'%→'+fbaPctNow.toFixed(1)+'%）');
+    if(avgIpi>0&&avgIpi5>0&&avgIpi>avgIpi5+30)cidIss.push('✅ IPI 同比提升 '+Math.round(avgIpi5)+'→'+Math.round(avgIpi)+'（+'+Math.round(avgIpi-avgIpi5)+'）');
+    if(!isNaN(avgWoc)&&!isNaN(avgWoc5)&&avgWoc5>0&&avgWoc<avgWoc5-2)cidIss.push('✅ WOC 同比缩短 '+avgWoc5.toFixed(1)+'→'+avgWoc.toFixed(1)+' 周');
+    if(!isNaN(excChg)&&excChg<-3)cidIss.push('✅ 冗余库存占比同比下降 '+Math.abs(excChg).toFixed(2)+'%');
+    if(cidIss.length)cidSum+=cidIss.join('。<br>');
+    else cidSum+='✅ 各项运营指标暂无明显异常。';
+    h+='<div class="summary" style="word-break:break-word">'+cidSum+'</div></div>';
+  }
+  const id1=nid(),id2=nid();
+  h+='<div class="g g2"><div class="cd"><div class="cd-t">各站点 '+latest+'月 GMS（'+y25+' vs '+y26+'）</div><canvas id="'+id1+'"></canvas></div>';
+  h+='<div class="cd"><div class="cd-t">月度 GMS 趋势</div><canvas id="'+id2+'"></canvas></div></div>';
+  postDraw.push({id:id1,fn:()=>{
+    mc(id1,{type:'bar',data:{labels:sites.map(s=>FL[s]+s),datasets:[
+      {label:y25,data:sites.map(s=>sum(rL5.filter(r=>r.site===s),'gms')),backgroundColor:'rgba(21,101,192,.45)'},
+      {label:y26,data:sites.map(s=>sum(rL6.filter(r=>r.site===s),'gms')),backgroundColor:'rgba(255,106,0,.7)'}
+    ]},options:{responsive:true,scales:{y:{ticks:{callback:v=>fK(v)}}}}});
+  }});
+  postDraw.push({id:id2,fn:()=>{
+    const allMM=[...new Set([...D.mm25,...D.mm26])].sort();
+    mc(id2,{type:'line',data:{labels:allMM.map(m=>m+'月'),datasets:[
+      {label:y25,data:allMM.map(mm=>sum(r25.filter(r=>r.mm===mm),'gms')||null),borderColor:'#1565c0',tension:.3,spanGaps:true},
+      {label:y26,data:allMM.map(mm=>sum(r26.filter(r=>r.mm===mm),'gms')||null),borderColor:'#ff6a00',tension:.3,spanGaps:true}
+    ]},options:{responsive:true,scales:{y:{ticks:{callback:v=>fK(v)}}}}});
+  }});
+
+  /* ============ SECTION 1.5: 站点占比 — 紧凑横条 ============ */
+  h+='<div class="cd"><div class="cd-t">各站点 GMS 占比</div>';
+  // YTD bar
+  h+='<div style="margin-bottom:8px"><div style="font-size:.72rem;color:var(--s);margin-bottom:3px">YTD '+y26+'</div><div style="display:flex;height:28px;border-radius:6px;overflow:hidden;font-size:.68rem;font-weight:600;color:#fff">';
+  const ytdTot=tg6||1;
+  sites.forEach((s,i)=>{const v=sum(rOl6.filter(r=>r.site===s),'gms');const p=v/ytdTot*100;if(p>0)h+='<div style="width:'+p+'%;background:'+CL[i]+';display:flex;align-items:center;justify-content:center;min-width:30px" title="'+FL[s]+s+' '+fK(v)+' ('+p.toFixed(1)+'%)">'+s+' '+p.toFixed(1)+'%</div>';});
+  h+='</div></div>';
+  // Latest month bar
+  h+='<div><div style="font-size:.72rem;color:var(--s);margin-bottom:3px">'+latest+'月</div><div style="display:flex;height:28px;border-radius:6px;overflow:hidden;font-size:.68rem;font-weight:600;color:#fff">';
+  const latTot=lg6||1;
+  sites.forEach((s,i)=>{const v=sum(rL6.filter(r=>r.site===s),'gms');const p=v/latTot*100;if(p>0)h+='<div style="width:'+p+'%;background:'+CL[i]+';display:flex;align-items:center;justify-content:center;min-width:30px" title="'+FL[s]+s+' '+fK(v)+' ('+p.toFixed(1)+'%)">'+s+' '+p.toFixed(1)+'%</div>';});
+  h+='</div></div></div>';
+  // site share table
+  h+='<div class="cd"><div class="cd-t">各站点 GMS 占比 & YoY 对比</div><div class="tw"><table class="dt"><thead><tr><th>站点</th><th>'+latest+'月 GMS</th><th>'+latest+'月占比</th><th>'+latest+'月 YoY</th><th>YTD GMS</th><th>YTD 占比</th><th>YTD YoY</th><th>CR</th><th>Benchmark CR</th><th>SP ACOS</th><th>Benchmark SP ACOS</th></tr></thead><tbody>';
+  sites.forEach(s=>{
+    const sg6=sum(rL6.filter(r=>r.site===s),'gms'),sg5=sum(rL5.filter(r=>r.site===s),'gms');
+    const ytd6=sum(rOl6.filter(r=>r.site===s),'gms'),ytd5=sum(rOl5.filter(r=>r.site===s),'gms');
+    const latShare=lg6?(sg6/lg6*100):0,ytdShare=tg6?(ytd6/tg6*100):0;
+    const gY=sg5?(sg6-sg5)/sg5*100:NaN,yY=ytd5?(ytd6-ytd5)/ytd5*100:NaN;
+    const sRows6=rL6.filter(r=>r.site===s);
+    // 占比表 CR：CID 有就直接取，否则用 ITK 的 Units/GV 算
+    let _tscr;
+    const _cidR=D2?D2.r26.filter(r=>r.site===s&&r.mm===(D2.latest)):[];
+    if(_cidR.length){_tscr=pct(_cidR[0].cr)}
+    else{const _tsu=sum(sRows6,'units'),_tsgv=sum(sRows6,'gv');_tscr=_tsgv>0?(_tsu/_tsgv*100):NaN;}
+    const _sbmcr=wA(sRows6,'bmCR');
+    h+='<tr><td>'+FL[s]+' '+s+'</td><td>'+fK(sg6)+'</td><td>'+latShare.toFixed(1)+'%</td><td>'+tHraw(gY)+'</td><td>'+fK(ytd6)+'</td><td>'+ytdShare.toFixed(1)+'%</td><td>'+tHraw(yY)+'</td><td>'+(isNaN(_tscr)?'—':_tscr.toFixed(2)+'%')+'</td><td>'+fP(_sbmcr)+'</td><td>'+fP(wA(sRows6,'spACOS'))+'</td><td>'+fP(wA(sRows6,'bmSpACOS'))+'</td></tr>';
+  });
+  h+='</tbody></table></div></div>';
+  // share summary
+  let shareSumTxt='<b>占比总结：</b>';
+  const siteRanked=sites.slice().sort((a,b)=>sum(rOl6.filter(r=>r.site===b),'gms')-sum(rOl6.filter(r=>r.site===a),'gms'));
+  siteRanked.forEach((s,i)=>{const v=sum(rOl6.filter(r=>r.site===s),'gms');const pct2=tg6?(v/tg6*100):0;shareSumTxt+=FL[s]+s+' '+pct2.toFixed(1)+'%'+(i<siteRanked.length-1?' / ':'');});
+  shareSumTxt+='。';
+  const topSite=siteRanked[0],topPct=tg6?(sum(rOl6.filter(r=>r.site===topSite),'gms')/tg6*100):0;
+  shareSumTxt+='<b>'+FL[topSite]+topSite+' 为最大站点（'+topPct.toFixed(1)+'%）。</b>';
+  // find fastest growing & declining site
+  let bestS=null,bestY=-Infinity,worstS=null,worstY=Infinity;
+  sites.forEach(s=>{const g5=sum(rOl5.filter(r=>r.site===s),'gms'),g6=sum(rOl6.filter(r=>r.site===s),'gms');if(g5>0){const y=(g6-g5)/g5*100;if(y>bestY){bestY=y;bestS=s}if(y<worstY){worstY=y;worstS=s}}});
+  if(bestS&&bestY>0)shareSumTxt+=' '+FL[bestS]+bestS+' YTD 增速最快 +'+bestY.toFixed(1)+'%。';
+  if(worstS&&worstY<0)shareSumTxt+=' <b>⚠️ '+FL[worstS]+worstS+' YTD 下滑 '+worstY.toFixed(1)+'%，需重点关注。</b>';
+  h+='<div class="summary">'+shareSumTxt+'</div>';
+
+  /* --- 逐月同期对比明细（放在全站总览内） --- */
+  h+='<div class="sub-blk"><div class="sub-blk-t">📊 逐月同期对比明细</div>';
+  h+='<div class="tw"><table class="dt"><thead><tr><th>月份</th>';
+  sites.forEach(s=>{h+='<th>'+s+' ('+y25+')</th><th>'+s+' ('+y26+')</th><th>YoY</th>'});
+  h+='<th>合计 ('+y25+')</th><th>合计 ('+y26+')</th><th>合计 YoY</th></tr></thead><tbody>';
+  overlap.forEach(mm=>{
+    h+='<tr><td>'+mm+'月</td>';let s5=0,s6=0;
+    sites.forEach(s=>{const g5=sum(r25.filter(r=>r.mm===mm&&r.site===s),'gms'),g6=sum(r26.filter(r=>r.mm===mm&&r.site===s),'gms');s5+=g5;s6+=g6;
+      h+='<td>'+fK(g5)+'</td><td>'+fK(g6)+'</td><td>'+tHraw(g5?(g6-g5)/g5*100:NaN)+'</td>';});
+    h+='<td>'+fK(s5)+'</td><td>'+fK(s6)+'</td><td>'+tHraw(s5?(s6-s5)/s5*100:NaN)+'</td></tr>';
+  });
+  h+='</tbody></table></div>';
+  let moS='<b>逐月总结：</b>';
+  overlap.forEach(mm=>{const v5=sum(r25.filter(r=>r.mm===mm),'gms'),v6=sum(r26.filter(r=>r.mm===mm),'gms');const y=v5?(v6-v5)/v5*100:0;moS+=mm+'月 '+(y>=0?'↑':'↓')+Math.abs(y).toFixed(1)+'%　';});
+  h+='<div class="summary">'+moS+'</div>';
+  h+='</div>'; /* close sub-blk 逐月 */
+
+  h+='</div>'; /* close sec-1 */
+
+  /* ============ SECTION 2: 按站点 ============ */
+  h+='<div class="sec sec-2">';
+  h+='<div class="st">🌍 按站点深度分析</div>';
+  h+='<div class="ss">每个站点：最新月份表现、YTD、头部品类、广告效率、问题点</div>';
+  sites.forEach((s,si)=>{
+    h+='<div class="site-blk site-'+s.toLowerCase()+'">';
+    const sL6=rL6.filter(r=>r.site===s),sL5=rL5.filter(r=>r.site===s);
+    const sO6=rOl6.filter(r=>r.site===s),sO5=rOl5.filter(r=>r.site===s);
+    const sg6=sum(sL6,'gms'),sg5=sum(sL5,'gms'),su6=sum(sL6,'units'),su5=sum(sL5,'units');
+    // 站点级 CR/ASP：CID 有字段直接取，fallback 用 ITK 的 Units/GV 和 GMS/Units 算
+    let scr6Pct,sasp6Val,sCrYoYPct,sAspYoYPct;
+    const _cidSrc=D2?D2.r26.filter(r=>r.site===s&&r.mm===(D2.latest)):[];
+    const _cidSrc5=D2?D2.r25.filter(r=>r.site===s&&r.mm===(D2.latest)):[];
+    if(_cidSrc.length){
+      // CID 每站点一行，直接取 raw data 字段
+      scr6Pct=pct(_cidSrc[0].cr); // pct() 处理 pctScale
+      sasp6Val=_cidSrc[0].asp; // ASP 是金额，P() 解析后就是数值
+      sCrYoYPct=pct(_cidSrc[0].crYoY);
+      sAspYoYPct=pct(_cidSrc[0].aspYoY);
+    }else{
+      // fallback: ITK 数据自己算
+      const sgv6=sum(sL6,'gv'),sgv5=sum(sL5,'gv');
+      scr6Pct=sgv6>0?(su6/sgv6*100):NaN;
+      sasp6Val=su6>0?(sg6/su6):NaN;
+      const _scr5=sgv5>0?(su5/sgv5):NaN, _sasp5=su5>0?(sg5/su5):NaN;
+      sCrYoYPct=(!isNaN(scr6Pct)&&!isNaN(_scr5)&&_scr5>0)?((scr6Pct/100-_scr5)/_scr5*100):NaN;
+      sAspYoYPct=(!isNaN(sasp6Val)&&!isNaN(_sasp5)&&_sasp5>0)?((sasp6Val-_sasp5)/_sasp5*100):NaN;
+    }
+    const sbcr=wA(sL6,'bmCR'),sac=wA(sL6,'spACOS'),sbac=wA(sL6,'bmSpACOS'),stc=wA(sL6,'spTACOS'),sro=wA(sL6,'spROAS');
+    const ytdG6=sum(sO6,'gms'),ytdG5=sum(sO5,'gms');
+    const gY=sg5?(sg6-sg5)/sg5*100:NaN;const ytdY=ytdG5?(ytdG6-ytdG5)/ytdG5*100:NaN;
+    const latShare=lg6?(sg6/lg6*100):0;const ytdShare=tg6?(ytdG6/tg6*100):0;
+    h+='<div class="site-hd">'+FL[s]+' '+s+' — GMS 占比 '+latShare.toFixed(1)+'%（'+latest+'月）/ '+ytdShare.toFixed(1)+'%（YTD）</div>';
+    // === 业绩表现（ITK 数据）===
+    h+='<div class="sub-blk">';
+    h+='<div class="sub-blk-t">📊 业绩表现</div>';
+    h+='<div class="kr">';
+    [{l:latest+'月 GMS',v:fK(sg6),c:!isNaN(gY)?gY:null},{l:latest+'月 Units',v:fN(su6),c:su5?(su6-su5)/su5*100:null},
+     {l:'CR',v:isNaN(scr6Pct)?'—':scr6Pct.toFixed(2)+'%',c:!isNaN(sCrYoYPct)?sCrYoYPct:null},
+     {l:'ASP',v:isNaN(sasp6Val)?'—':'$'+sasp6Val.toFixed(2),c:!isNaN(sAspYoYPct)?sAspYoYPct:null},
+     {l:'YTD GMS',v:fK(ytdG6),c:!isNaN(ytdY)?ytdY:null}
+    ].forEach(k=>{
+      let ch='';if(k.c!==undefined&&k.c!==null&&!isNaN(k.c))ch='<div class="ch '+(k.c>=0?'up':'dn')+'">'+(k.c>=0?'▲':'▼')+Math.abs(k.c).toFixed(1)+'%</div>';
+      h+='<div class="kc"><div class="l">'+k.l+'</div><div class="v">'+k.v+'</div>'+ch+'</div>';
+    });h+='</div>';
+    // 业绩总结
+    const crG=(!isNaN(scr6Pct)&&!isNaN(sbcr))?(scr6Pct-pct(sbcr)):NaN;
+    let perfSum='<b>'+FL[s]+' '+s+' 业绩总结：</b>'+latest+'月 GMS '+fK(sg6)+'（占全站 '+latShare.toFixed(1)+'%），同比'+(!isNaN(gY)?(gY>=0?'增长':'下降')+' '+Math.abs(gY).toFixed(1)+'%':'无同期')+'。YTD '+fK(ytdG6)+'，同比'+(!isNaN(ytdY)?(ytdY>=0?'增长':'下降')+' '+Math.abs(ytdY).toFixed(1)+'%':'—')+'。';
+    let perfIss=[];
+    if(!isNaN(gY)&&gY<-5)perfIss.push('GMS 同比下降 '+Math.abs(gY).toFixed(1)+'%');
+    if(!isNaN(crG)&&crG<-0.5)perfIss.push('CR 低于 BM '+Math.abs(crG).toFixed(1)+'%');
+    if(perfIss.length)perfSum+='<b>⚠️ 问题点：</b>'+perfIss.join('；')+'。';
+    else perfSum+='✅ 暂无明显问题。';
+    h+='<div class="summary">'+perfSum+'</div>';
+    h+='</div>'; /* close sub-blk-itk */
+
+    /* --- 站点级 CID 补充指标（紧跟业绩表现之后） --- */
+    if(D2){
+      const sc2=D2.r26.filter(r=>r.site===s&&r.mm===D2.latest);
+      const sc2L5=D2.r25.filter(r=>r.site===s&&r.mm===D2.latest);
+      if(sc2.length){
+        h+='<div class="sub-blk">';
+        h+='<div class="sub-blk-t">📦 补充运营指标（CID 汇总数据）</div>';
+        const sAdsSpend=sum(sc2,'adsSpend'),sAdsSales=sum(sc2,'adsSales');
+        const sSpSpend=sum(sc2,'spSpend'),sSbSpend=sum(sc2,'sbSpend'),sSdSpend=sum(sc2,'sdSpend');
+        const sNewGms=sum(sc2,'newGms'),sFbaGms=sum(sc2,'fbaGms'),sGms2=sum(sc2,'gms');
+        const sPromo=sum(sc2,'promoOps'),sDeal=sum(sc2,'dealOps'),sCoupon=sum(sc2,'couponOps');
+        const sIpi=sc2[0].ipi,sWoc=sc2[0].woc,sExc=sc2[0].excessPct;
+        const sAACOS=wA(sc2,'adsACOS'),sATACOS=wA(sc2,'adsTACOS');
+        const sAdsSpend5=sum(sc2L5,'adsSpend'),sAdsSales5=sum(sc2L5,'adsSales');
+        const sNewGms5=sum(sc2L5,'newGms'),sFbaGms5=sum(sc2L5,'fbaGms'),sGms25=sum(sc2L5,'gms');
+        const sPromo5=sum(sc2L5,'promoOps'),sDeal5=sum(sc2L5,'dealOps'),sCoupon5=sum(sc2L5,'couponOps');
+        const sAACOS5=wA(sc2L5,'adsACOS'),sATACOS5=wA(sc2L5,'adsTACOS');
+        const sSpSpend5=sum(sc2L5,'spSpend'),sSbSpend5=sum(sc2L5,'sbSpend'),sSdSpend5=sum(sc2L5,'sdSpend');
+        const sIpi5=sc2L5.length?sc2L5[0].ipi:NaN,sWoc5=sc2L5.length?sc2L5[0].woc:NaN,sExc5=sc2L5.length?sc2L5[0].excessPct:NaN;
+        const sAROAS=wA(sc2,'adsROAS'),sAROAS5=wA(sc2L5,'adsROAS');
+        const sNewPct26=sGms2?(sNewGms/sGms2*100):NaN,sNewPct25=sGms25?(sNewGms5/sGms25*100):NaN;
+        const sFbaPct26=sGms2?(sFbaGms/sGms2*100):NaN,sFbaPct25=sGms25?(sFbaGms5/sGms25*100):NaN;
+        function sYoy(a,b){return b?(a-b)/b*100:NaN}
+        function sPpChg(a,b){return(!isNaN(a)&&!isNaN(b))?(pct(a)-pct(b)):NaN}
+        h+='<div class="kr">';
+        [{l:'Ads Spend',v:fK(sAdsSpend),c:sYoy(sAdsSpend,sAdsSpend5)},
+         {l:'Ads Sales',v:fK(sAdsSales),c:sYoy(sAdsSales,sAdsSales5)},
+         {l:'Ads ACOS',v:fP(sAACOS),c:sPpChg(sAACOS,sAACOS5),pp:true},
+         {l:'Ads ROAS',v:fR(sAROAS),c:sAROAS5>0?(sAROAS-sAROAS5)/sAROAS5*100:NaN},
+         {l:'Ads TACOS',v:fP(sATACOS),c:sPpChg(sATACOS,sATACOS5),pp:true},
+         {l:'SP',v:fK(sSpSpend),c:sYoy(sSpSpend,sSpSpend5)},
+         {l:'SB',v:fK(sSbSpend),c:sYoy(sSbSpend,sSbSpend5)},
+         {l:'SD',v:fK(sSdSpend),c:sYoy(sSdSpend,sSdSpend5)},
+         {l:'New GMS',v:fK(sNewGms),c:sYoy(sNewGms,sNewGms5)},
+         {l:'New GMS%',v:!isNaN(sNewPct26)?sNewPct26.toFixed(1)+'%':'—',c:(!isNaN(sNewPct26)&&!isNaN(sNewPct25))?(sNewPct26-sNewPct25):NaN,pp:true},
+         {l:'FBA GMS',v:fK(sFbaGms),c:sYoy(sFbaGms,sFbaGms5)},
+         {l:'FBA%',v:!isNaN(sFbaPct26)?sFbaPct26.toFixed(1)+'%':'—',c:(!isNaN(sFbaPct26)&&!isNaN(sFbaPct25))?(sFbaPct26-sFbaPct25):NaN,pp:true},
+         {l:'Promo OPS',v:fK(sPromo),c:sYoy(sPromo,sPromo5)},
+         {l:'Deal OPS',v:fK(sDeal),c:sYoy(sDeal,sDeal5)},
+         {l:'Coupon',v:fK(sCoupon),c:sYoy(sCoupon,sCoupon5)},
+         {l:'IPI',v:sIpi>0?Math.round(sIpi).toString():'—',c:(sIpi>0&&sIpi5>0)?(sIpi-sIpi5):NaN,raw:true},
+         {l:'WOC',v:!isNaN(sWoc)&&sWoc>0?sWoc.toFixed(1):'—',c:(!isNaN(sWoc)&&sWoc>0&&!isNaN(sWoc5)&&sWoc5>0)?(sWoc-sWoc5):NaN,raw:true},
+         {l:'Excess%',v:fP(sExc),c:sPpChg(sExc,sExc5),pp:true}
+        ].forEach(k=>{
+          let ch='';
+          if(k.c!==undefined&&k.c!==null&&!isNaN(k.c)){
+            if(k.raw)ch='<div class="ch '+(k.c>=0?'up':'dn')+'">'+(k.c>=0?'▲':'▼')+Math.abs(k.c).toFixed(1)+'</div>';
+            else if(k.pp)ch='<div class="ch '+(k.c>=0?'up':'dn')+'">'+(k.c>=0?'▲':'▼')+Math.abs(k.c).toFixed(2)+'%</div>';
+            else ch='<div class="ch '+(k.c>=0?'up':'dn')+'">'+(k.c>=0?'▲':'▼')+Math.abs(k.c).toFixed(1)+'%</div>';
+          }
+          h+='<div class="kc"><div class="l">'+k.l+'</div><div class="v">'+k.v+'</div>'+ch+'</div>';
+        });
+        h+='</div>';
+        // CID diagnostic summary
+        let sDiag='<b>'+FL[s]+' '+s+' 运营诊断（CID）：</b>';const sDiagItems=[];
+        const sAcosChg=sPpChg(sAACOS,sAACOS5);
+        if(!isNaN(sAcosChg)&&sAcosChg>2)sDiagItems.push('⚠️ ACOS 同比上升 '+sAcosChg.toFixed(2)+'%（'+fP(sAACOS5)+'→'+fP(sAACOS)+'）');
+        const sTacosChg=sPpChg(sATACOS,sATACOS5);
+        if(!isNaN(sTacosChg)&&sTacosChg>1)sDiagItems.push('⚠️ TACOS 同比上升 '+sTacosChg.toFixed(2)+'%');
+        const sRoasChg=sAROAS5>0?(sAROAS-sAROAS5)/sAROAS5*100:NaN;
+        if(!isNaN(sRoasChg)&&sRoasChg<-15)sDiagItems.push('⚠️ ROAS 同比下降 '+Math.abs(sRoasChg).toFixed(1)+'%（'+fR(sAROAS5)+'→'+fR(sAROAS)+'）');
+        const sAdsSpendY=sYoy(sAdsSpend,sAdsSpend5),sAdsSalesY=sYoy(sAdsSales,sAdsSales5);
+        if(!isNaN(sAdsSpendY)&&!isNaN(sAdsSalesY)&&sAdsSpendY>sAdsSalesY+10)sDiagItems.push('⚠️ 广告花费增速（+'+sAdsSpendY.toFixed(1)+'%）远超销售增速（+'+sAdsSalesY.toFixed(1)+'%）');
+        const sSpY=sYoy(sSpSpend,sSpSpend5),sSbY=sYoy(sSbSpend,sSbSpend5),sSdY=sYoy(sSdSpend,sSdSpend5);
+        if(!isNaN(sSpY)&&sSpY>30&&(!isNaN(sAcosChg)&&sAcosChg>1))sDiagItems.push('⚠️ SP 花费 +'+sSpY.toFixed(1)+'% 且 ACOS 上升');
+        const sNewPct=sGms2?(sNewGms/sGms2*100):0,sNewPct5=sGms25?(sNewGms5/sGms25*100):0;
+        if(sNewPct<sNewPct5-3)sDiagItems.push('⚠️ 新品占比下降（'+sNewPct5.toFixed(1)+'%→'+sNewPct.toFixed(1)+'%）');
+        const sFbaNow=sGms2?(sFbaGms/sGms2*100):0,sFbaPrev=sGms25?(sFbaGms5/sGms25*100):0;
+        if(sFbaNow<sFbaPrev-3)sDiagItems.push('⚠️ FBA 占比下降（'+sFbaPrev.toFixed(1)+'%→'+sFbaNow.toFixed(1)+'%）');
+        if(sIpi>0&&sIpi<400)sDiagItems.push('⚠️ IPI '+Math.round(sIpi)+'（<400）');
+        if(sIpi>0&&sIpi5>0&&sIpi<sIpi5-30)sDiagItems.push('⚠️ IPI 同比下降 '+Math.round(sIpi5)+'→'+Math.round(sIpi)+'（-'+Math.round(sIpi5-sIpi)+'）');
+        if(!isNaN(sWoc)&&sWoc>12)sDiagItems.push('⚠️ 库存周转 '+sWoc.toFixed(1)+' 周');
+        if(!isNaN(sWoc)&&!isNaN(sWoc5)&&sWoc5>0&&sWoc>sWoc5+3)sDiagItems.push('⚠️ WOC 同比增加 '+sWoc5.toFixed(1)+'→'+sWoc.toFixed(1)+' 周');
+        if(!isNaN(pct(sExc))&&pct(sExc)>15)sDiagItems.push('⚠️ 冗余库存 '+pct(sExc).toFixed(1)+'%');
+        const sExcChg=sPpChg(sExc,sExc5);
+        if(!isNaN(sExcChg)&&sExcChg>3)sDiagItems.push('⚠️ 冗余库存占比同比上升 '+sExcChg.toFixed(2)+'%');
+        if(!isNaN(sAcosChg)&&sAcosChg<-1)sDiagItems.push('✅ ACOS 优化 '+Math.abs(sAcosChg).toFixed(2)+'%');
+        if(!isNaN(sRoasChg)&&sRoasChg>15)sDiagItems.push('✅ ROAS 提升 +'+sRoasChg.toFixed(1)+'%');
+        if(!isNaN(sAdsSalesY)&&sAdsSalesY>20)sDiagItems.push('✅ 广告销售同比 +'+sAdsSalesY.toFixed(1)+'%');
+        if(sNewPct>sNewPct5+3)sDiagItems.push('✅ 新品占比提升（'+sNewPct5.toFixed(1)+'%→'+sNewPct.toFixed(1)+'%）');
+        if(sFbaNow>sFbaPrev+3)sDiagItems.push('✅ FBA 占比提升（'+sFbaPrev.toFixed(1)+'%→'+sFbaNow.toFixed(1)+'%）');
+        if(sIpi>0&&sIpi5>0&&sIpi>sIpi5+30)sDiagItems.push('✅ IPI 提升 '+Math.round(sIpi5)+'→'+Math.round(sIpi));
+        if(!isNaN(sWoc)&&!isNaN(sWoc5)&&sWoc5>0&&sWoc<sWoc5-2)sDiagItems.push('✅ WOC 缩短 '+sWoc5.toFixed(1)+'→'+sWoc.toFixed(1)+' 周');
+        if(!isNaN(sExcChg)&&sExcChg<-3)sDiagItems.push('✅ 冗余库存下降 '+Math.abs(sExcChg).toFixed(2)+'%');
+        if(sDiagItems.length)sDiag+=sDiagItems.join('。<br>');
+        else sDiag+='✅ 各项运营指标暂无明显异常。';
+        h+='<div class="summary" style="word-break:break-word">'+sDiag+'</div>';
+        h+='</div>'; /* close sub-blk-cid */
+      }
+    }
+
+    // Build cats from LATEST MONTH data (sL6/sL5) for primary view
+    const grpL6={},grpL5={};
+    sL6.forEach(r=>{const k=r.cat;if(!grpL6[k])grpL6[k]=[];grpL6[k].push(r)});
+    sL5.forEach(r=>{const k=r.cat;if(!grpL5[k])grpL5[k]=[];grpL5[k].push(r)});
+    let cats=Object.entries(grpL6).map(([cat,rows])=>{
+      const g6=sum(rows,'gms'),u6=sum(rows,'units');const prev=grpL5[cat];const g5=prev?sum(prev,'gms'):0;const u5=prev?sum(prev,'units'):0;
+      const yoy=g5?(g6-g5)/g5*100:NaN;
+      const cr=wA(rows,'cr'),bcr=wA(rows,'bmCR'),asp=wA(rows,'asp'),basp=wA(rows,'bmASP');
+      const ac=wA(rows,'spACOS'),bac=wA(rows,'bmSpACOS'),tc=wA(rows,'spTACOS'),ro=wA(rows,'spROAS');
+      const crPrev=prev?wA(prev,'cr'):NaN;
+      const crGap=(!isNaN(cr)&&!isNaN(bcr))?(pct(cr)-pct(bcr)):NaN;
+      const acGap=(!isNaN(ac)&&!isNaN(bac))?(pct(ac)-pct(bac)):NaN;
+      const crChg=(!isNaN(cr)&&!isNaN(crPrev))?(pct(cr)-pct(crPrev)):NaN;
+      // detect issues
+      const flags=[];
+      if(!isNaN(yoy)&&yoy<-15)flags.push({t:'GMS↓',c:'#c62828',tip:'GMS 同比下降 '+Math.abs(yoy).toFixed(1)+'%'});
+      if(!isNaN(crGap)&&crGap<-0.5)flags.push({t:'CR<BM',c:'#e65100',tip:'CR 低于 BM '+Math.abs(crGap).toFixed(2)+'%'});
+      if(!isNaN(acGap)&&acGap>3)flags.push({t:'ACOS↑',c:'#b71c1c',tip:'ACOS 高于 BM '+acGap.toFixed(1)+'%'});
+      if(!isNaN(yoy)&&yoy>30&&g5>100)flags.push({t:'🔥猛增',c:'#1a8c2d',tip:'GMS 同比增长 +'+yoy.toFixed(1)+'%'});
+      if(!isNaN(crChg)&&crChg<-0.5)flags.push({t:'CR↓',c:'#d84315',tip:'CR 同比下降 '+Math.abs(crChg).toFixed(2)+'%'});
+      if(!prev&&g6>200)flags.push({t:'🆕新品类',c:'#1565c0',tip:'2025同月无数据'});
+      return{cat,g6,g5,u6,u5,yoy,cr,bcr,asp,basp,ac,bac,tc,ro,crGap,acGap,crChg,flags,
+        tier:rows.find(r=>r.tier)?.tier||'',isTop80:rows.some(r=>r.isTop80)};
+    }).sort((a,b)=>b.g6-a.g6);
+    // === 品类明细表（最新月份） ===
+    h+='<div class="cd"><div class="cd-t">'+s+' 品类明细（'+latest+'月 最新月份）</div><div class="tw"><table class="dt cat-table"><thead><tr><th>品类</th><th>问题标记</th><th>'+latest+'月 GMS</th><th>同期 GMS</th><th>GMS YoY</th><th>Units</th><th>CR</th><th>BM CR</th><th>CR vs BM</th><th>ASP</th><th>SP ACOS</th><th>BM ACOS</th><th>ACOS vs BM</th><th>SP ROAS</th></tr></thead><tbody>';
+    cats.forEach(c=>{
+      const flagsHtml=c.flags.length?c.flags.map(f=>'<span style="display:inline-block;padding:1px 4px;border-radius:3px;font-size:.6rem;font-weight:600;color:#fff;background:'+f.c+';margin-right:2px" title="'+f.tip+'">'+f.t+'</span>').join(''):'<span style="color:#aaa;font-size:.6rem">—</span>';
+      const crVsBm=!isNaN(c.crGap)?'<span style="color:'+(c.crGap>=0?'var(--g)':'var(--r)')+';font-weight:600">'+(c.crGap>=0?'+':'')+c.crGap.toFixed(2)+'pp</span>':'—';
+      const acVsBm=!isNaN(c.acGap)?'<span style="color:'+(c.acGap<=0?'var(--g)':'var(--r)')+';font-weight:600">'+(c.acGap>=0?'+':'')+c.acGap.toFixed(1)+'pp</span>':'—';
+      h+='<tr><td>'+c.cat+'</td><td style="text-align:left">'+flagsHtml+'</td><td>'+fK(c.g6)+'</td><td>'+fK(c.g5)+'</td><td>'+tHraw(c.yoy)+'</td><td>'+fN(c.u6)+'</td><td>'+fP(c.cr)+'</td><td>'+fP(c.bcr)+'</td><td>'+crVsBm+'</td><td>'+fD(c.asp)+'</td><td>'+fP(c.ac)+'</td><td>'+fP(c.bac)+'</td><td>'+acVsBm+'</td><td>'+fR(c.ro)+'</td></tr>';
+    });
+    h+='</tbody></table></div></div>';
+    // === 品类发现（精简版：按GMS占比排序，对比BM给建议） ===
+    const totalSiteGms=sum(cats,'g6');
+    const topCats=cats.filter(c=>c.g6>0).slice(0,5); // Top 5 by GMS
+    if(topCats.length){
+      let insightTxt='<b>'+FL[s]+' '+s+' 核心品类 vs 大盘（'+latest+'月）：</b><br>';
+      topCats.forEach(c=>{
+        const share=totalSiteGms?(c.g6/totalSiteGms*100):0;
+        let note='';
+        // CR vs BM
+        if(!isNaN(c.crGap)){
+          if(c.crGap<-0.3)note+='CR 低于 BM '+Math.abs(c.crGap).toFixed(2)+'%';
+          else if(c.crGap>0.3)note+='CR 优于 BM +'+c.crGap.toFixed(2)+'% ✅';
+        }
+        // ACOS vs BM
+        if(!isNaN(c.acGap)){
+          if(note)note+='；';
+          if(c.acGap>2)note+='ACOS 高于 BM '+c.acGap.toFixed(1)+'%';
+          else if(c.acGap<-2)note+='ACOS 优于 BM '+Math.abs(c.acGap).toFixed(1)+'% ✅';
+        }
+        if(!note)note='与大盘持平';
+        insightTxt+='　• <b>'+c.cat+'</b>（占比 '+share.toFixed(1)+'%，GMS '+fK(c.g6)+'）：'+note+'<br>';
+      });
+      h+='<div class="summary" style="word-break:break-word">'+insightTxt+'</div>';
+    }
+    h+='</div>'; /* close site-blk */
+  });
+  h+='</div>'; /* close sec-2 */
+
+  /* ============ SECTION ASIN: ASIN 级分析（按 ASIN 聚合） ============ */
+  if(D3){
+    h+='<div class="sec sec-asin">';
+    const aLatest=D3.latest;
+    h+='<div class="st">🔬 ASIN 级分析（Top 80% GMS · '+aLatest+'月）</div>';
+    h+='<div class="ss">仅展示 GMS Top80% 的 ASIN，按 GMS 降序，对比 Benchmark</div>';
+
+    // 最新月 Top80% ASIN（所有站点合并，每行=一个 ASIN+站点组合）
+    let allAsins=D3.r26.filter(r=>r.mm===aLatest&&r.isTop80).sort((a,b)=>b.gms-a.gms);
+    // 兜底：如果 Top80% 标记仍为空，直接取最新月所有 ASIN 按 GMS 降序截取到 80%
+    if(!allAsins.length){
+      const latAll=D3.r26.filter(r=>r.mm===aLatest&&r.gms>0).sort((a,b)=>b.gms-a.gms);
+      const tot=latAll.reduce((s,r)=>s+r.gms,0);
+      let cum=0;
+      allAsins=latAll.filter(r=>{cum+=r.gms;return cum<=tot*0.8||r===latAll[0]});
+    }
+    const totalGms=allAsins.reduce((s,r)=>s+r.gms,0);
+
+    if(allAsins.length){
+      // 明细表
+      h+='<div class="cd"><div class="cd-t">ASIN 明细（'+allAsins.length+' 条 Top80% 记录）</div><div class="tw"><table class="dt asin-table"><thead><tr>';
+      h+='<th>ASIN</th><th>站点</th><th>品类</th><th>GMS</th><th>占比</th><th>GMS YoY</th><th>Units</th><th>CR</th><th>BM CR</th><th>CR vs BM</th><th>ASP</th><th>BM ASP</th><th>渗透率 YoY</th><th>状态</th>';
+      h+='</tr></thead><tbody>';
+
+      const goodList=[],issueList=[];
+
+      allAsins.forEach(a=>{
+        const share=totalGms?(a.gms/totalGms*100):0;
+        const crGap=(!isNaN(a.cr)&&!isNaN(a.bmCR))?(pct(a.cr)-pct(a.bmCR)):NaN;
+        const gmsY=pct(a.gmsYoY);
+        const penY=pct(a.gmsPenYoY);
+
+        const flags=[];
+        if(!isNaN(crGap)&&crGap>0.3)flags.push({t:'CR✅',c:'var(--g)',tip:'CR 优于 BM +'+crGap.toFixed(2)+'%'});
+        if(!isNaN(crGap)&&crGap<-0.3)flags.push({t:'CR⚠️',c:'var(--r)',tip:'CR 低于 BM '+Math.abs(crGap).toFixed(2)+'%'});
+        if(!isNaN(gmsY)&&gmsY>20)flags.push({t:'GMS↑',c:'var(--g)',tip:'GMS YoY +'+gmsY.toFixed(1)+'%'});
+        if(!isNaN(gmsY)&&gmsY<-15)flags.push({t:'GMS↓',c:'var(--r)',tip:'GMS YoY '+gmsY.toFixed(1)+'%'});
+        if(!isNaN(penY)&&penY<-0.3)flags.push({t:'份额↓',c:'var(--r)',tip:'渗透率 YoY '+penY.toFixed(2)+'%'});
+        if(!isNaN(penY)&&penY>0.3)flags.push({t:'份额↑',c:'var(--g)',tip:'渗透率 YoY +'+penY.toFixed(2)+'%'});
+
+        const hasBad=flags.some(f=>f.c==='var(--r)');
+        const hasGood=flags.some(f=>f.c==='var(--g)')&&!hasBad;
+
+        const rec={asin:a.asin,site:a.site,cat:a.cat,gms:a.gms,share,crGap,gmsY,penY,cr:a.cr,bmCR:a.bmCR,flags};
+        if(hasBad)issueList.push(rec);
+        else if(hasGood)goodList.push(rec);
+
+        const crVsBm=!isNaN(crGap)?'<span style="color:'+(crGap>=0?'var(--g)':'var(--r)')+';font-weight:600">'+(crGap>=0?'+':'')+crGap.toFixed(2)+'pp</span>':'—';
+        const flagsHtml=flags.length?flags.map(f=>'<span style="display:inline-block;padding:1px 4px;border-radius:3px;font-size:.6rem;font-weight:600;color:#fff;background:'+f.c+';margin-right:2px" title="'+f.tip+'">'+f.t+'</span>').join(''):'—';
+
+        h+='<tr><td style="font-family:monospace;font-size:.68rem">'+a.asin+'</td>';
+        h+='<td>'+FL[a.site]+a.site+'</td><td>'+a.cat+'</td>';
+        h+='<td>'+fK(a.gms)+'</td><td>'+share.toFixed(1)+'%</td>';
+        h+='<td>'+tHraw(gmsY)+'</td><td>'+fN(a.units)+'</td>';
+        h+='<td>'+fP(a.cr)+'</td><td>'+fP(a.bmCR)+'</td><td>'+crVsBm+'</td>';
+        h+='<td>'+fD(a.asp)+'</td><td>'+fD(a.bmASP)+'</td>';
+        h+='<td>'+(!isNaN(penY)?tHraw(penY):'—')+'</td>';
+        h+='<td style="text-align:left">'+flagsHtml+'</td></tr>';
+      });
+      h+='</tbody></table></div></div>';
+
+      // 总结
+      let asinSum='<b>ASIN 总结（'+aLatest+'月 Top80%）：</b><br>';
+
+      if(goodList.length){
+        goodList.sort((a,b)=>b.gms-a.gms);
+        asinSum+='✅ <b>表现好的 ASIN（'+Math.min(goodList.length,5)+'个）：</b><br>';
+        goodList.slice(0,5).forEach(a=>{
+          let d=FL[a.site]+a.site+'，占比 '+a.share.toFixed(1)+'%';
+          if(!isNaN(a.crGap)&&a.crGap>0)d+='，CR 优于 BM +'+a.crGap.toFixed(2)+'%';
+          if(!isNaN(a.gmsY)&&a.gmsY>0)d+='，GMS YoY +'+a.gmsY.toFixed(1)+'%';
+          if(!isNaN(a.penY)&&a.penY>0)d+='，渗透率 +'+a.penY.toFixed(2)+'%';
+          asinSum+='　• <b>'+a.asin+'</b>（'+a.cat+'，'+fK(a.gms)+'）：'+d+'<br>';
+        });
+      }
+
+      if(issueList.length){
+        if(goodList.length)asinSum+='<br>';
+        issueList.sort((a,b)=>b.gms-a.gms);
+        asinSum+='⚠️ <b>有机会点的 ASIN（'+Math.min(issueList.length,5)+'个）：</b><br>';
+        issueList.slice(0,5).forEach(a=>{
+          let d=FL[a.site]+a.site+'，占比 '+a.share.toFixed(1)+'%';
+          if(!isNaN(a.crGap)&&a.crGap<0)d+='，CR 低于 BM '+Math.abs(a.crGap).toFixed(2)+'%';
+          if(!isNaN(a.gmsY)&&a.gmsY<0)d+='，GMS YoY '+a.gmsY.toFixed(1)+'%';
+          if(!isNaN(a.penY)&&a.penY<0)d+='，渗透率 '+a.penY.toFixed(2)+'%';
+          asinSum+='　• <b>'+a.asin+'</b>（'+a.cat+'，'+fK(a.gms)+'）：'+d+'<br>';
+        });
+      }
+
+      if(!goodList.length&&!issueList.length)asinSum+='各 ASIN 与大盘基本持平。';
+      h+='<div class="summary" style="word-break:break-word">'+asinSum+'</div>';
+    }else{
+      h+='<p style="color:#888;font-size:.72rem;padding:8px">无 Top80% ASIN 数据</p>';
+    }
+
+    h+='</div>'; /* close sec-asin */
+  }
+
+  /* ============ SECTION 4: 综合总结（CID + ITK + ASIN） ============ */
+  h+='<div class="sec sec-4">';
+  h+='<div class="st">🚀 综合总结</div><div class="ss">基于 CID / ITK / ASIN 三维数据 · '+y26+'-'+latest+'</div>';
+  h+='<div class="il" id="dSum"></div>';
+  h+='</div>'; /* close sec-4 */
+
+  el.innerHTML=h;
+  postDraw.forEach(p=>p.fn());
+  renderSummary();
+}
+
+function renderSummary(){
+  const{r26,r25,y26,y25,overlap,latest,sites}=D;
+  const rL6=r26.filter(r=>r.mm===latest),rL5=r25.filter(r=>r.mm===latest);
+  const rOl6=r26.filter(r=>overlap.includes(r.mm)),rOl5=r25.filter(r=>overlap.includes(r.mm));
+  const lg6=sum(rL6,'gms'),lg5=sum(rL5,'gms'),tg6=sum(rOl6,'gms'),tg5=sum(rOl5,'gms');
+  const gYoY=lg5?(lg6-lg5)/lg5*100:NaN;
+  const ytdYoY=tg5?(tg6-tg5)/tg5*100:NaN;
+
+  const items=[];
+
+  // --- 1. 全站 GMS 趋势（ITK） ---
+  let t1='📊 全站 '+latest+'月 GMS '+fK(lg6);
+  if(!isNaN(gYoY))t1+='，同比 '+(gYoY>=0?'+':'')+gYoY.toFixed(1)+'%';
+  t1+='；YTD '+fK(tg6);
+  if(!isNaN(ytdYoY))t1+='，同比 '+(ytdYoY>=0?'+':'')+ytdYoY.toFixed(1)+'%';
+  // 找增长最快和下滑最多的站点
+  let bestS=null,bestY=-Infinity,worstS=null,worstY=Infinity;
+  sites.forEach(s=>{
+    const g5=sum(rOl5.filter(r=>r.site===s),'gms'),g6=sum(rOl6.filter(r=>r.site===s),'gms');
+    if(g5>0){const y=(g6-g5)/g5*100;if(y>bestY){bestY=y;bestS=s}if(y<worstY){worstY=y;worstS=s}}
+  });
+  let p1='';
+  if(bestS&&bestY>0)p1+=FL[bestS]+bestS+' YTD 增速最快 +'+bestY.toFixed(1)+'%';
+  if(worstS&&worstY<0)p1+=(p1?'；':'')+FL[worstS]+worstS+' YTD 下滑 '+Math.abs(worstY).toFixed(1)+'%';
+  items.push({t:t1,p:p1,c:(!isNaN(gYoY)&&gYoY<0)?'':'op'});
+
+  // --- 2. 广告效率（CID） ---
+  if(D2){
+    const c2L=D2.r26.filter(r=>r.mm===D2.latest),c2L5=D2.r25.filter(r=>r.mm===D2.latest);
+    const tAdsSpend=sum(c2L,'adsSpend'),tAdsSales=sum(c2L,'adsSales');
+    const tAdsSpend5=sum(c2L5,'adsSpend'),tAdsSales5=sum(c2L5,'adsSales');
+    const aACOS=wA(c2L,'adsACOS'),aROAS=wA(c2L,'adsROAS');
+    const aACOS5=wA(c2L5,'adsACOS'),aROAS5=wA(c2L5,'adsROAS');
+    const acosChg=(!isNaN(aACOS)&&!isNaN(aACOS5))?(pct(aACOS)-pct(aACOS5)):NaN;
+    const spendY=tAdsSpend5?(tAdsSpend-tAdsSpend5)/tAdsSpend5*100:NaN;
+    const salesY=tAdsSales5?(tAdsSales-tAdsSales5)/tAdsSales5*100:NaN;
+    let t2='💰 广告花费 '+fK(tAdsSpend);
+    if(!isNaN(spendY))t2+='（YoY '+(spendY>=0?'+':'')+spendY.toFixed(1)+'%）';
+    t2+='，ACOS '+fP(aACOS);
+    if(!isNaN(acosChg))t2+='（'+(acosChg>=0?'+':'')+acosChg.toFixed(2)+'pp）';
+    t2+='，ROAS '+fR(aROAS);
+    let p2='广告销售 '+fK(tAdsSales);
+    if(!isNaN(salesY))p2+='（YoY '+(salesY>=0?'+':'')+salesY.toFixed(1)+'%）';
+    if(!isNaN(spendY)&&!isNaN(salesY)&&spendY>salesY+10)p2+='；花费增速超过销售增速 '+(spendY-salesY).toFixed(1)+'%';
+    items.push({t:t2,p:p2,c:(!isNaN(acosChg)&&acosChg>2)?'':'op'});
+
+    // --- 3. 库存健康（CID） ---
+    const avgIpi=c2L.reduce((s,r)=>s+(r.ipi||0),0)/Math.max(c2L.filter(r=>r.ipi>0).length,1);
+    const avgWoc=c2L.reduce((s,r)=>s+(r.woc||0),0)/Math.max(c2L.filter(r=>r.woc>0).length,1);
+    const avgExc=wA(c2L,'excessPct');
+    if(avgIpi>0||avgWoc>0){
+      let t3='📦 库存：IPI '+(avgIpi>0?Math.round(avgIpi):'—')+'，WOC '+(avgWoc>0?avgWoc.toFixed(1)+'周':'—');
+      if(!isNaN(avgExc))t3+='，冗余 '+fP(avgExc);
+      let p3='';
+      const avgIpi5=c2L5.length?c2L5.reduce((s,r)=>s+(r.ipi||0),0)/Math.max(c2L5.filter(r=>r.ipi>0).length,1):NaN;
+      const avgWoc5=c2L5.length?c2L5.reduce((s,r)=>s+(r.woc||0),0)/Math.max(c2L5.filter(r=>r.woc>0).length,1):NaN;
+      if(avgIpi>0&&avgIpi5>0)p3+='IPI 同比 '+(avgIpi>avgIpi5?'+':'')+Math.round(avgIpi-avgIpi5);
+      if(avgWoc>0&&avgWoc5>0)p3+=(p3?'；':'')+'WOC 同比 '+(avgWoc>avgWoc5?'+':'')+((avgWoc-avgWoc5)).toFixed(1)+'周';
+      const isBad=(avgIpi>0&&avgIpi<400)||(!isNaN(avgWoc)&&avgWoc>12);
+      items.push({t:t3,p:p3,c:isBad?'w':'op'});
+    }
+  }
+
+  // --- 4. 品类 vs BM（ITK） ---
+  const allCrGaps=[],allAcGaps=[];
+  sites.forEach(s=>{
+    const sL6=rL6.filter(r=>r.site===s);
+    const cr=wA(sL6,'cr'),bcr=wA(sL6,'bmCR'),ac=wA(sL6,'spACOS'),bac=wA(sL6,'bmSpACOS');
+    const crG=(!isNaN(cr)&&!isNaN(bcr))?(pct(cr)-pct(bcr)):NaN;
+    const acG=(!isNaN(ac)&&!isNaN(bac))?(pct(ac)-pct(bac)):NaN;
+    if(!isNaN(crG))allCrGaps.push({s,crG,cr,bcr});
+    if(!isNaN(acG))allAcGaps.push({s,acG,ac,bac});
+  });
+  if(allCrGaps.length){
+    const worst=allCrGaps.sort((a,b)=>a.crG-b.crG)[0];
+    const best=allCrGaps[allCrGaps.length-1];
+    let t4='📈 CR vs BM：';
+    if(worst.crG<-0.3)t4+=FL[worst.s]+worst.s+' CR 低于 BM '+Math.abs(worst.crG).toFixed(2)+'pp（'+fP(worst.cr)+' vs '+fP(worst.bcr)+'）';
+    else t4+='各站点 CR 均接近或优于 BM';
+    let p4='';
+    if(best.crG>0.3)p4+=FL[best.s]+best.s+' CR 优于 BM +'+best.crG.toFixed(2)+'%';
+    const worstAc=allAcGaps.sort((a,b)=>b.acG-a.acG)[0];
+    if(worstAc&&worstAc.acG>2)p4+=(p4?'；':'')+FL[worstAc.s]+worstAc.s+' ACOS 高于 BM '+worstAc.acG.toFixed(1)+'%';
+    items.push({t:t4,p:p4,c:(worst.crG<-0.5)?'w':'op'});
+  }
+
+  // --- 5. ASIN 级亮点/机会（ASIN） ---
+  if(D3){
+    const aLatest=D3.latest;
+    const allA=D3.r26.filter(r=>r.mm===aLatest&&r.isTop80).sort((a,b)=>b.gms-a.gms);
+    if(allA.length){
+      const topA=allA.slice(0,3);
+      // 找 CR 最低于 BM 的 ASIN
+      const withCrGap=allA.map(a=>{
+        const crG=(!isNaN(a.cr)&&!isNaN(a.bmCR))?(pct(a.cr)-pct(a.bmCR)):NaN;
+        return{...a,crG};
+      }).filter(a=>!isNaN(a.crG));
+      const worstCr=withCrGap.sort((a,b)=>a.crG-b.crG).slice(0,2);
+      const bestCr=withCrGap.sort((a,b)=>b.crG-a.crG).slice(0,2);
+
+      let t5='🔬 ASIN：Top 3 为 '+topA.map(a=>a.asin+'（'+FL[a.site]+fK(a.gms)+'）').join('、');
+      let p5='';
+      if(worstCr.length&&worstCr[0].crG<-0.3){
+        p5+='CR 机会点：'+worstCr.filter(a=>a.crG<-0.3).map(a=>a.asin+'（'+FL[a.site]+a.site+'，CR '+fP(a.cr)+' vs BM '+fP(a.bmCR)+'，差 '+Math.abs(a.crG).toFixed(2)+'pp）').join('；');
+      }
+      if(bestCr.length&&bestCr[0].crG>0.3){
+        p5+=(p5?'。':'')+'CR 领先：'+bestCr.filter(a=>a.crG>0.3).map(a=>a.asin+'（'+FL[a.site]+a.site+'，+'+a.crG.toFixed(2)+'pp）').join('；');
+      }
+      items.push({t:t5,p:p5,c:'op'});
+    }
+  }
+
+  // 渲染
+  const el=document.getElementById('dSum');
+  if(!el)return;
+  el.innerHTML=items.slice(0,5).map((it,i)=>{
+    const cls='ic'+(it.c?' '+it.c:'');
+    return '<div class="'+cls+'"><h4><span class="nm">'+(i+1)+'</span>'+it.t+'</h4>'+(it.p?'<p>'+it.p+'</p>':'')+'</div>';
+  }).join('')||'<p style="color:#888">暂无数据</p>';
+}
+</script>
+</body>
+</html>
